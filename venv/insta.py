@@ -1,5 +1,9 @@
 import instaloader
 import re
+import os
+import discord
+import shutil
+
 def getInstaPost(shortcode):
     if shortcode:
         L = instaloader.Instaloader()
@@ -7,13 +11,22 @@ def getInstaPost(shortcode):
         L.download_post(post, target=shortcode)
 
 def getShortcode(user_input):
-    insta_pattern = r"^(https://www\.)?instagram\.com(/.*)?$"
-    shortcode_pattern = r"^.*/(.*)/\?.*$"
-    isInsta = True if re.search(insta_pattern, user_input) else False
-    if isInsta:
-        return re.search(shortcode_pattern, user_input).group(1)
-    return ''
+    pattern = 'https?:\/\/(?:www\.)?instagram\.com\/[^\/]+(?:\/[^\/]+)?\/([^\/]{11})\/.*'
+    return re.search(pattern, user_input).group(1)
 
-shortcode = getShortcode('https://www.instagram.com/reel/DHkb-M_tK9l/?igsh=am5wNHpiaTNxMm1x')
-print(shortcode)
-# getInstaPost(shortcode)
+async def sendMedia(shortcode, message):
+    if shortcode:
+        for filename in os.listdir(shortcode):
+            if filename[-3:] == 'mp4':
+                with open(f'{shortcode}/{filename}', 'rb') as f:
+                    file = discord.File(f)
+                    await message.reply(file=file)
+                shutil.rmtree(shortcode)
+                return
+        for filename in os.listdir(shortcode):
+            if filename[-3:] == 'jpg':
+                with open(f'{shortcode}/{filename}', 'rb') as f:
+                    file = discord.File(f)
+                    await message.reply(file=file)
+                shutil.rmtree(shortcode)
+                return

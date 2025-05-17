@@ -12,7 +12,7 @@ DOTENV_PATH = CURRENT_SCRIPT_DIR.parent / '.env'
 
 # Load the .env file if it exists at the specified path
 if DOTENV_PATH.exists():
-    load_dotenv(dotenv_path=DOTENV_PATH)
+    load_dotenv(dotenv_path=DOTENV_PATH, override=True)
     print(f"INFO: Loaded .env file from: {DOTENV_PATH}")
 else:
     # If .env is not in the parent directory, os.getenv() will rely on actual environment variables

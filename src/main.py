@@ -1,6 +1,6 @@
 from discord import Intents, Client, Message
 from responses import get_response
-from config import DISCORD_TOKEN
+from config import getDiscordToken
 
 
 # STEP 1: BOT SETUP
@@ -48,7 +48,8 @@ async def on_message(message: Message) -> None:
 
 # STEP 5: MAIN ENTRY POINT
 def main() -> None:
-    client.run(token=DISCORD_TOKEN)
+    token = getDiscordToken()
+    client.run(token)
 
 
 if __name__ == '__main__':

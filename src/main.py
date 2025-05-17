@@ -1,13 +1,7 @@
-from typing import Final
-import os
-from dotenv import load_dotenv
 from discord import Intents, Client, Message
 from responses import get_response
-import discord
+from config import DISCORD_TOKEN
 
-# STEP 0: LOAD OUR TOKEN FROM SOMEWHERE SAFE
-load_dotenv()
-TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
 
 # STEP 1: BOT SETUP
 intents: Intents = Intents.default()
@@ -54,7 +48,7 @@ async def on_message(message: Message) -> None:
 
 # STEP 5: MAIN ENTRY POINT
 def main() -> None:
-    client.run(token=TOKEN)
+    client.run(token=DISCORD_TOKEN)
 
 
 if __name__ == '__main__':

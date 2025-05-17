@@ -1,6 +1,9 @@
 from discord import Intents, Client, Message
 from responses import get_response
-from config import DISCORD_TOKEN
+from config import getToken
+import argparse
+from dotenv import load_dotenv
+import os
 
 
 # STEP 1: BOT SETUP
@@ -48,7 +51,17 @@ async def on_message(message: Message) -> None:
 
 # STEP 5: MAIN ENTRY POINT
 def main() -> None:
-    client.run(token=DISCORD_TOKEN)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dev', action='store_true')
+    args = parser.parse_args()
+
+    if args.dev:
+        token = getToken('dev')
+    else:
+        token = getToken('prod')
+
+    client.run(token)
 
 
 if __name__ == '__main__':

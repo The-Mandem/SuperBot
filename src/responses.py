@@ -1,11 +1,8 @@
-from insta import getInstaPost, getShortcode, sendMedia
+from insta import downloadShortcode, getShortcode, sendMedia
 
 async def get_response(message):
     user_input = message.content
     shortcode = getShortcode(user_input)
-    getInstaPost(shortcode)
-    await sendMedia(shortcode, message)
-    
-
-
-        
+    if(shortcode):
+        downloadShortcode(shortcode)
+        await sendMedia(shortcode, message)

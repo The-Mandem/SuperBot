@@ -1,0 +1,54 @@
+name: Deploy Discord Bot to Raspberry Pi
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Pi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Raspberry Pi and Restart Service
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PI_HOST }}
+          username: ${{ secrets.PI_USER }}
+          key: ${{ secrets.PI_SSH_KEY }}
+          port: 22
+          script: |
+            set -e # Exit immediately if a command exits with a non-zero status
+
+            echo "--- Navigating to bot directory ---"
+            cd ${{ secrets.BOT_REPO_PATH }}
+
+            echo "--- Fetching latest changes from Git ---"
+            git fetch origin main # Fetch latest from remote 'main'
+            git reset --hard origin/main # Force local to match remote 'main', discarding local changes
+            # Alternatively, if you prefer 'git pull' and trust no local changes:
+            # git pull origin main
+
+            echo "--- Restarting systemd service: ${{ secrets.SYSTEMD_SERVICE_NAME }} ---"
+            sudo systemctl restart ${{ secrets.SYSTEMD_SERVICE_NAME }}
+
+            echo "--- Waiting for service to start (5 seconds) ---"
+            sleep 5
+
+            echo "--- Checking service status: ${{ secrets.SYSTEMD_SERVICE_NAME }} ---"
+            if sudo systemctl is-active --quiet ${{ secrets.SYSTEMD_SERVICE_NAME }}; then
+              echo "✅ Service '${{ secrets.SYSTEMD_SERVICE_NAME }}' is active and running."
+            else
+              echo "🚨 ERROR: Service '${{ secrets.SYSTEMD_SERVICE_NAME }}' FAILED to start or is not active."
+              echo "--- Displaying last few log lines (if supported by your service logging) ---"
+              # This journalctl command assumes your service logs to systemd's journal
+              # You might need to adjust if your bot logs to a file directly
+              sudo journalctl -u ${{ secrets.SYSTEMD_SERVICE_NAME }} -n 20 --no-pager
+              echo "--- Displaying full service status ---"
+              sudo systemctl status ${{ secrets.SYSTEMD_SERVICE_NAME }} --no-pager
+              exit 1 # Fail the GitHub Actions job
+            fi

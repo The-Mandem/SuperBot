@@ -145,3 +145,5 @@ celerybeat-schedule
 
 # PDM
 __pypackages__/
+
+.python-version

@@ -1,8 +1,34 @@
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import argparse
 
-def getToken(app_env):
+def getDiscordToken():
+    parser = argparse.ArgumentParser(
+        description="Set application environment (dev/prod).",
+    )
+
+    # Create a mutually exclusive group. Only one of these can be active.
+    group = parser.add_mutually_exclusive_group(required=False) # Not required, because we have a default
+
+    group.add_argument(
+        '--dev',
+        action='store_true',
+        help="Run in development mode. This is the default if no environment flag is specified."
+    )
+    group.add_argument(
+        '--prod',
+        action='store_true',
+        help="Run in production mode."
+    )
+
+    args = parser.parse_args()
+
+    app_env = 'dev'  # Default to development
+
+    if args.prod:
+        app_env = 'prod'
+
     # Directory containing this config.py file (e.g., /project/src)
     # This assumes config.py is in the same directory as your other script files like main.py
     CURRENT_SCRIPT_DIR = Path(__file__).resolve().parent
@@ -54,5 +80,5 @@ def getToken(app_env):
         # This state should ideally not be reached if APP_ENV is valid and the corresponding token is set.
         raise ValueError("CRITICAL: Discord token could not be loaded. Ensure APP_ENV is correctly set ('prod' or 'dev') "
                         "and the corresponding token (DISCORD_TOKEN_PROD or DISCORD_TOKEN_DEV) is available.")
-    
+
     return DISCORD_TOKEN

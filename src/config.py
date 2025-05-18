@@ -50,8 +50,9 @@ class ConfigManager:
             print(f"INFO: .env file not found at the expected parent directory location: {self._dotenv_path}. "
                   "Relying on system environment variables or defaults if tokens are not set.")
 
-        # Load Discord token based on app_env and store it as an instance variable
+        # Load Discord token and Gemini key based on app_env
         self._discord_token = None
+
         if self._app_env == 'prod':
             self._discord_token = os.getenv('DISCORD_TOKEN_PROD')
             if not self._discord_token:
@@ -81,6 +82,15 @@ class ConfigManager:
             raise ValueError("CRITICAL: Discord token could not be loaded. Ensure APP_ENV is correctly set ('prod' or 'dev') "
                              "and the corresponding token (DISCORD_TOKEN_PROD or DISCORD_TOKEN_DEV) is available.")
 
+        # Load Gemini key
+        self._gemini_key = os.getenv('GEMINI_KEY')
+
+        if not self._gemini_key:
+            raise ValueError(
+                f"ERROR: GEMINI_KEY is not set. "
+                f"Checked .env at '{self._dotenv_path}' and system environment variables."
+            )
+
         ConfigManager._initialized = True
 
     def get_discord_token(self) -> str:
@@ -96,3 +106,9 @@ class ConfigManager:
             # This should not happen if __init__ completed successfully.
             raise RuntimeError("App environment accessed before initialization or initialization failed.")
         return self._app_env
+
+    def get_gemini_key(self) -> str:
+        """Returns the loaded Gemini API key."""
+        if self._gemini_key is None:
+            raise RuntimeError("Gemini key accessed before initialization or initialization failed.")
+        return self._gemini_key

@@ -1,8 +1,5 @@
 import requests
-from dotenv import load_dotenv
 from config import ConfigManager
-
-load_dotenv()
 
 def gemini(prompt):
     config = ConfigManager()
@@ -24,5 +21,3 @@ def gemini(prompt):
     else:
         print(f"Error: {response.status_code}")
         return None
-
-print(gemini("hi"))

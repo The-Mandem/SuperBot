@@ -15,9 +15,10 @@ async def send_message(message: Message, user_message: str) -> None:
     if not user_message:
         print('(Message was empty because intents were not enabled probably)')
         return
-
     try:
-        await get_response(message)
+        result = await get_response(message)
+        if not result:
+            print("Failed to process Instagram post")
     except Exception as e:
         print(e)
 

@@ -19,17 +19,27 @@ def downloadShortcode(shortcode):
     L.download_post(post, target=shortcode)
 
 async def sendMedia(shortcode, message):
+    if not os.path.exists(shortcode):
+        return False
+
+    media_sent = False
     for filename in os.listdir(shortcode):
-        if filename[-3:] == 'mp4':
+        if filename.endswith('mp4'):
             with open(f'{shortcode}/{filename}', 'rb') as f:
                 file = discord.File(f)
                 await message.reply(file=file)
-            shutil.rmtree(shortcode)
-            return
-    for filename in os.listdir(shortcode):
-        if filename[-3:] == 'jpg':
-            with open(f'{shortcode}/{filename}', 'rb') as f:
-                file = discord.File(f)
-                await message.reply(file=file)
-            shutil.rmtree(shortcode)
-            return
+            media_sent = True
+            break
+
+    if not media_sent:
+        for filename in os.listdir(shortcode):
+            if filename.endswith('jpg'):
+                with open(f'{shortcode}/{filename}', 'rb') as f:
+                    file = discord.File(f)
+                    await message.reply(file=file)
+                media_sent = True
+                break
+
+    if os.path.exists(shortcode):
+        shutil.rmtree(shortcode)
+    return media_sent

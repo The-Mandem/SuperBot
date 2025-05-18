@@ -30,8 +30,6 @@ jobs:
             echo "--- Fetching latest changes from Git ---"
             git fetch origin main # Fetch latest from remote 'main'
             git reset --hard origin/main # Force local to match remote 'main', discarding local changes
-            # Alternatively, if you prefer 'git pull' and trust no local changes:
-            # git pull origin main
 
             echo "--- Restarting systemd service: ${{ secrets.SYSTEMD_SERVICE_NAME }} ---"
             sudo systemctl restart ${{ secrets.SYSTEMD_SERVICE_NAME }}
@@ -44,11 +42,12 @@ jobs:
               echo "✅ Service '${{ secrets.SYSTEMD_SERVICE_NAME }}' is active and running."
             else
               echo "🚨 ERROR: Service '${{ secrets.SYSTEMD_SERVICE_NAME }}' FAILED to start or is not active."
-              echo "--- Displaying last few log lines (if supported by your service logging) ---"
-              # This journalctl command assumes your service logs to systemd's journal
-              # You might need to adjust if your bot logs to a file directly
+
+              echo "--- Displaying last few log lines ---"
               sudo journalctl -u ${{ secrets.SYSTEMD_SERVICE_NAME }} -n 20 --no-pager
+
               echo "--- Displaying full service status ---"
               sudo systemctl status ${{ secrets.SYSTEMD_SERVICE_NAME }} --no-pager
+
               exit 1 # Fail the GitHub Actions job
             fi

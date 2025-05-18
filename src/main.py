@@ -1,65 +1,61 @@
-from discord import Intents, Client, Message
-from responses import get_response
-from config import ConfigManager
+from discord import Intents, Message
 from discord.ext import commands
-import gemini
+from config import ConfigManager
+from features.instagram_feature import InstagramFeature
+from features.gemini_feature import GeminiFeature
 
-# STEP 1: BOT SETUP
 intents: Intents = Intents.default()
-intents.message_content = True  # NOQA
+intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-# STEP 2: MESSAGE FUNCTIONALITY
-async def send_message(message: Message, user_message: str) -> None:
-    if not user_message:
-        print('(Message was empty because intents were not enabled probably)')
-        return
-    try:
-        result = await get_response(message)
-        if not result:
-            print("Failed to process Instagram post")
-    except Exception as e:
-        print(e)
-
-
-# STEP 3: HANDLING THE STARTUP FOR OUR BOT
 @bot.event
 async def on_ready() -> None:
     print(f'{bot.user} is now running!')
 
+    # Instagram Feature
+    instagram_feature = InstagramFeature(bot)
+    await instagram_feature.setup()
 
-# STEP 4: HANDLING INCOMING MESSAGES
+    # Gemini Feature
+    gemini_feature = GeminiFeature(bot)
+    await gemini_feature.setup()
+
+    print("All features initialized and set up.")
+
+
 @bot.event
 async def on_message(message: Message) -> None:
+    # Ignore messages from the bot itself to prevent loops
     if message.author == bot.user:
         return
 
+    # Basic logging (can be expanded or moved to a dedicated logging module)
     username = str(message.author)
     user_message = message.content
-    channel = str(message.channel)
+    channel_name = str(message.channel)
+    guild_name = str(message.guild.name) if message.guild else "DirectMessage"
 
-    print(f'[{channel}] {username}: "{user_message}"')
+    log_message = f'[{guild_name} - #{channel_name}] {username}: "{user_message}"'
+    # Truncate long messages for cleaner logs
+    if len(log_message) > 300:
+        log_message = log_message[:297] + "..."
+    print(log_message)
 
-    await send_message(message, user_message)
     await bot.process_commands(message)
 
 
-@bot.command(name="gemini")
-async def gemini_command(ctx, *, prompt):
-    response = gemini.gemini(prompt)
-    if response:
-        await ctx.send(response)
-    else:
-        await ctx.send("Error getting response.")
-
-
-
-# STEP 5: MAIN ENTRY POINT
 def main() -> None:
     config = ConfigManager()
-    token = config.get_discord_token()
-    bot.run(token)
+    try:
+        discord_token = config.get_discord_token()
+        if not discord_token:
+            raise ValueError("Discord token is not available. Exiting.")
+        bot.run(discord_token)
+    except ValueError as e:
+        print(f"CRITICAL CONFIGURATION ERROR: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred during bot startup or runtime: {e}")
 
 
 if __name__ == '__main__':

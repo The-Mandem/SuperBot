@@ -1,7 +1,6 @@
 from discord import Intents, Client, Message
 from responses import get_response
-from config import getDiscordToken
-
+from config import ConfigManager
 
 # STEP 1: BOT SETUP
 intents: Intents = Intents.default()
@@ -43,7 +42,8 @@ async def on_message(message: Message) -> None:
 
 # STEP 5: MAIN ENTRY POINT
 def main() -> None:
-    token = getDiscordToken()
+    config = ConfigManager()
+    token = config.get_discord_token()
     client.run(token)
 
 

@@ -23,9 +23,9 @@ async def on_ready() -> None:
     await gemini_feature.setup()
 
     #Postman/API caller Feature
-    postman_feature = Postman()
+    postman_feature = Postman(bot)
     await postman_feature.setup()
-    
+
     print("All features initialized and set up.")
 
 

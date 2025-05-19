@@ -1,149 +1,18 @@
-# --- Python ---
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
-*$py.class
-
-# C extensions
-*.so
-
-# Distribution / packaging
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-# Usually these files are in 'dist' folder one level above src folder
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-pytestdebug.log
-
-# Translations
-*.mo
-*.pot
-*.po
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-instance/ # Flask instance folder
-
-# Flask specific:
-instance/
-.webassets-cache
-
-# Scrapy files:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-doc/_build/
-
-# PyBuilder
-target/
-
-# --- Virtual Environments ---
 .env*
 .venv
 env/
 venv/
 ENV/
 VENV/
-pyvenv.cfg # Part of venv
-
-# --- Editors & IDEs ---
-# PyCharm
-.idea/
-*.iml
-*.ipr
-*.iws
-# VS Code
 .vscode/
-# Sublime Text
-*.sublime-project
-*.sublime-workspace
-# Atom
-.atom/
-# Jupyter Notebook
-.ipynb_checkpoints
-# Spyder
-.spyderproject
-.spyproject
-
-# --- OS Generated Files ---
-# macOS
 .DS_Store
-.AppleDouble
-.LSOverride
-Icon?
-._*
-.Spotlight-V100
-.Trashes
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-# Linux
-*~
-# Various
-.fuse_hidden*
-.directory
-.Trash-*
-
-# --- Secrets & Sensitive Data ---
-secrets.yaml
-credentials.json
-*.pem
 *.key
 .env
-
-# --- Other ---
-# Celery
-celerybeat-schedule
-
-# MyPy
 .mypy_cache/
-
-# Ruff
 .ruff_cache/
-
-# PDM
 __pypackages__/
-
 .python-version
+.prettierrc

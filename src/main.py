@@ -3,6 +3,7 @@ from discord.ext import commands
 from config import ConfigManager
 from features.instagram_feature import InstagramFeature
 from features.gemini_feature import GeminiFeature
+from features.postman_feature import Postman
 
 intents: Intents = Intents.default()
 intents.message_content = True
@@ -20,6 +21,10 @@ async def on_ready() -> None:
     # Gemini Feature
     gemini_feature = GeminiFeature(bot)
     await gemini_feature.setup()
+
+    #Postman/API caller Feature
+    postman_feature = Postman(bot)
+    await postman_feature.setup()
 
     print("All features initialized and set up.")
 

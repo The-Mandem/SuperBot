@@ -7,7 +7,7 @@ from discord import Message, Embed
 class Postman:
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.format_message = "Format: <request_type> <endpoint> <param:param_value> (<auth:bearer-token> optional)"
+        self.format_message = "Usage: <request_type> <endpoint> <param:param_value> (<auth:bearer-token> optional). Please wrap key value pairs in quotes. accepted request types: put, post, get, delete"
 
     def _parse_value(self, val):
         if val == 'null': return None
@@ -72,7 +72,7 @@ class Postman:
                 await message.reply(embed=Embed(title="API Response", description=content, color=0x00FF00))
 
     async def setup(self):
-        @commands.command(name="postman")
+        @commands.command(name="postman", help=self.format_message)
         async def postman_command(ctx: commands.Context, req_type: str, endpoint: str, *args: str):
             if not req_type or not endpoint:
                 await ctx.send("Please provide the request type and endpoint.")

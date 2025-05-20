@@ -25,6 +25,10 @@ async def on_ready() -> None:
     #Postman/API caller Feature
     postman_feature = Postman(bot)
     await postman_feature.setup()
+    
+    # Bqq feature
+    bqq_feature = bqq_feature(bot)
+    await bqq_feature.setup()
 
     print("All features initialized and set up.")
 

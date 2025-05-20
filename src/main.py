@@ -4,6 +4,7 @@ from config import ConfigManager
 from features.instagram_feature import InstagramFeature
 from features.gemini_feature import GeminiFeature
 from features.postman_feature import Postman
+from features.bqq_feature import NoBqqFeature
 
 intents: Intents = Intents.default()
 intents.message_content = True

@@ -21,7 +21,7 @@ class Postman:
             except:
                 return val
 
-    def _make_request(self, req_type: str, endpoint: str, *args: list[str]):
+    def _make_request(self, req_type: str, endpoint: str, *args: str):
         payload = {}
         headers = {}
         for argument in args:

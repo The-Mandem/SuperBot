@@ -1,53 +1,139 @@
-name: Deploy Discord Bot to Raspberry Pi
+name: Build, Lint, and Deploy Discord Bot
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main # Lint on PRs targeting main
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
-  deploy:
-    name: Deploy to Pi
+  build-and-lint:
+    name: Build & Lint Bot
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Flake8
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+          # If your bot has dependencies that Flake8 needs to understand for import resolution,
+          # you might need to install them here too:
+          # pip install -r requirements.txt
+
+      - name: Lint with Flake8
+        run: |
+          # Flake8 will search for .py files in the current directory and subdirectories.
+          # Fails the build if Flake8 finds critical errors (syntax, undefined names)
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Provides style feedback but doesn't fail the job for these
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Placeholder for Tests
+        run: echo "No tests configured yet."
+
+  deploy:
+    name: Deploy to Pi
+    runs-on: ubuntu-latest
+    needs: build-and-lint # Only run if build-and-lint job succeeds
+    # This condition is important to ensure deployment only happens on a push to main,
+    # not on pull requests.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all history for git reset --hard
+
       - name: Deploy to Raspberry Pi and Restart Service
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.0.3 # Consider checking for a newer version of ssh-action
         with:
           host: ${{ secrets.PI_HOST }}
           username: ${{ secrets.PI_USER }}
           key: ${{ secrets.PI_SSH_KEY }}
-          port: 22
+          port: ${{ secrets.PI_PORT || 22 }}
           script: |
             set -e # Exit immediately if a command exits with a non-zero status
 
-            echo "--- Navigating to bot directory ---"
-            cd ${{ secrets.BOT_REPO_PATH }}
+            # Define variables for clarity and easier updates
+            BOT_DIR="${{ secrets.BOT_REPO_PATH }}" # e.g., /home/ameen/SuperBot
+            SYSTEMD_SERVICE="${{ secrets.SYSTEMD_SERVICE_NAME }}" # e.g., superbot.service
+            # Specific Python executable path on the Pi within the venv
+            PI_VENV_PYTHON_EXEC="$BOT_DIR/.venv/bin/python"
+            # System python to create venv if it doesn't exist (e.g., python3, python3.11)
+            # This should be a version capable of creating a venv for your target Python.
+            # If your system python3 is too old, you might need to specify a newer one like python3.11
+            PI_SYSTEM_PYTHON_FOR_VENV="python3"
 
-            echo "--- Fetching latest changes from Git ---"
-            git fetch origin main # Fetch latest from remote 'main'
-            git reset --hard origin/main # Force local to match remote 'main', discarding local changes
+            echo "--- Navigating to bot directory: $BOT_DIR ---"
+            cd "$BOT_DIR" || { echo "🚨 ERROR: Failed to cd to $BOT_DIR"; exit 1; }
 
-            echo "--- Restarting systemd service: ${{ secrets.SYSTEMD_SERVICE_NAME }} ---"
-            sudo systemctl restart ${{ secrets.SYSTEMD_SERVICE_NAME }}
+            echo "--- Fetching latest changes from Git (main branch) ---"
+            git fetch origin main
+            echo "--- Resetting local main branch to remote main branch (discarding local changes) ---"
+            git reset --hard origin/main
 
-            echo "--- Waiting for service to start (5 seconds) ---"
-            sleep 5
-
-            echo "--- Checking service status: ${{ secrets.SYSTEMD_SERVICE_NAME }} ---"
-            if sudo systemctl is-active --quiet ${{ secrets.SYSTEMD_SERVICE_NAME }}; then
-              echo "✅ Service '${{ secrets.SYSTEMD_SERVICE_NAME }}' is active and running."
+            echo "--- Ensuring Python virtual environment exists and is set up ---"
+            if [ ! -f "$PI_VENV_PYTHON_EXEC" ]; then
+              echo "Virtual environment Python not found at $PI_VENV_PYTHON_EXEC. Creating venv..."
+              # Ensure the .venv directory itself doesn't exist or is empty before creating
+              rm -rf "$BOT_DIR/.venv"
+              "$PI_SYSTEM_PYTHON_FOR_VENV" -m venv "$BOT_DIR/.venv"
+              echo "Virtual environment created."
             else
-              echo "🚨 ERROR: Service '${{ secrets.SYSTEMD_SERVICE_NAME }}' FAILED to start or is not active."
+              echo "Virtual environment Python found at $PI_VENV_PYTHON_EXEC."
+            fi
 
-              echo "--- Displaying last few log lines ---"
-              sudo journalctl -u ${{ secrets.SYSTEMD_SERVICE_NAME }} -n 20 --no-pager
+            echo "--- Installing/updating Python dependencies using $PI_VENV_PYTHON_EXEC ---"
+            "$PI_VENV_PYTHON_EXEC" -m pip install --upgrade pip
+            "$PI_VENV_PYTHON_EXEC" -m pip install -r requirements.txt
+            # Consider adding --no-cache-dir if you encounter caching issues:
+            # "$PI_VENV_PYTHON_EXEC" -m pip install --no-cache-dir -r requirements.txt
 
+            echo "--- Restarting systemd service: $SYSTEMD_SERVICE ---"
+            sudo systemctl restart "$SYSTEMD_SERVICE"
+
+            echo "--- Waiting for service to stabilize and checking status (up to 30 seconds) ---"
+            RETRY_COUNT=0
+            MAX_RETRIES=6
+            RETRY_DELAY=5
+            SERVICE_ACTIVE=false
+
+            sleep 5 # Initial short delay for service to attempt startup
+
+            until [ "$SERVICE_ACTIVE" = true ] || [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; do
+              RETRY_COUNT=$((RETRY_COUNT+1))
+              echo "Checking service status... (Attempt $RETRY_COUNT/$MAX_RETRIES)"
+              if sudo systemctl is-active --quiet "$SYSTEMD_SERVICE"; then
+                SERVICE_ACTIVE=true
+                echo "✅ Service '$SYSTEMD_SERVICE' is active and running."
+              else
+                if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
+                  echo "Service not active yet. Retrying in $RETRY_DELAY seconds..."
+                  sleep "$RETRY_DELAY"
+                fi
+              fi
+            done
+
+            if [ "$SERVICE_ACTIVE" != true ]; then
+              echo "🚨 ERROR: Service '$SYSTEMD_SERVICE' FAILED to start or is not active after $MAX_RETRIES attempts."
+              echo "--- Displaying last 50 log lines from journalctl ---"
+              sudo journalctl -u "$SYSTEMD_SERVICE" -n 50 --no-pager
               echo "--- Displaying full service status ---"
-              sudo systemctl status ${{ secrets.SYSTEMD_SERVICE_NAME }} --no-pager
-
+              sudo systemctl status "$SYSTEMD_SERVICE" --no-pager
               exit 1 # Fail the GitHub Actions job
             fi
+
+            echo "--- Deployment successful! ---"

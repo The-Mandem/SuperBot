@@ -24,21 +24,27 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
-      - name: Install Flake8
+      - name: Install Ruff and project dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8
-          # If your bot has dependencies that Flake8 needs to understand for import resolution,
-          # you might need to install them here too:
-          # pip install -r requirements.txt
+          pip install ruff
 
-      - name: Lint with Flake8
+          if [ -f requirements.txt ]; then
+            echo "Installing dependencies from requirements.txt..."
+            pip install -r requirements.txt
+          fi
+
+      - name: Lint with Ruff (default settings)
         run: |
-          # Flake8 will search for .py files in the current directory and subdirectories.
-          # Fails the build if Flake8 finds critical errors (syntax, undefined names)
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Provides style feedback but doesn't fail the job for these
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          # Check for linting errors using Ruff's default rules.
+          # This command will fail the build if any linting issues are found.
+          ruff check .
+
+      - name: Check formatting with Ruff (default settings)
+        run: |
+          # Check if code is formatted according to Ruff's default formatter (Black-compatible).
+          # This command will fail the build if any files need reformatting.
+          ruff format --check .
 
       - name: Placeholder for Tests
         run: echo "No tests configured yet."
@@ -58,23 +64,20 @@ jobs:
           fetch-depth: 0 # Fetches all history for git reset --hard
 
       - name: Deploy to Raspberry Pi and Restart Service
-        uses: appleboy/ssh-action@v1.0.3 # Consider checking for a newer version of ssh-action
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.PI_HOST }}
           username: ${{ secrets.PI_USER }}
           key: ${{ secrets.PI_SSH_KEY }}
           port: ${{ secrets.PI_PORT || 22 }}
           script: |
-            set -e # Exit immediately if a command exits with a non-zero status
+            set -e
 
-            # Define variables for clarity and easier updates
-            BOT_DIR="${{ secrets.BOT_REPO_PATH }}" # e.g., /home/ameen/SuperBot
-            SYSTEMD_SERVICE="${{ secrets.SYSTEMD_SERVICE_NAME }}" # e.g., superbot.service
-            # Specific Python executable path on the Pi within the venv
+            BOT_DIR="${{ secrets.BOT_REPO_PATH }}"
+            SYSTEMD_SERVICE="${{ secrets.SYSTEMD_SERVICE_NAME }}"
             PI_VENV_PYTHON_EXEC="$BOT_DIR/.venv/bin/python"
             # System python to create venv if it doesn't exist (e.g., python3, python3.11)
             # This should be a version capable of creating a venv for your target Python.
-            # If your system python3 is too old, you might need to specify a newer one like python3.11
             PI_SYSTEM_PYTHON_FOR_VENV="python3"
 
             echo "--- Navigating to bot directory: $BOT_DIR ---"
@@ -98,9 +101,13 @@ jobs:
 
             echo "--- Installing/updating Python dependencies using $PI_VENV_PYTHON_EXEC ---"
             "$PI_VENV_PYTHON_EXEC" -m pip install --upgrade pip
-            "$PI_VENV_PYTHON_EXEC" -m pip install -r requirements.txt
-            # Consider adding --no-cache-dir if you encounter caching issues:
-            # "$PI_VENV_PYTHON_EXEC" -m pip install --no-cache-dir -r requirements.txt
+            # Ensure requirements.txt exists on the Pi as well
+            if [ -f "$BOT_DIR/requirements.txt" ]; then
+              "$PI_VENV_PYTHON_EXEC" -m pip install -r "$BOT_DIR/requirements.txt"
+            else
+              echo "No requirements.txt found in $BOT_DIR, skipping dependency installation."
+            fi
+
 
             echo "--- Restarting systemd service: $SYSTEMD_SERVICE ---"
             sudo systemctl restart "$SYSTEMD_SERVICE"

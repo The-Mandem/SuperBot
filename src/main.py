@@ -13,7 +13,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready() -> None:
-    print(f'{bot.user} is now running!')
+    print(f"{bot.user} is now running!")
 
     # Instagram Feature
     instagram_feature = InstagramFeature(bot)
@@ -23,7 +23,7 @@ async def on_ready() -> None:
     gemini_feature = GeminiFeature(bot)
     await gemini_feature.setup()
 
-    #Postman/API caller Feature
+    # Postman/API caller Feature
     postman_feature = Postman(bot)
     await postman_feature.setup()
 
@@ -68,5 +68,5 @@ def main() -> None:
         print(f"An unexpected error occurred during bot startup or runtime: {e}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

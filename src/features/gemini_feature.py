@@ -110,7 +110,7 @@ class GeminiFeature:
         async def gemini_command(ctx: commands.Context, *, prompt: str):
             """Talk to the Gemini AI. Reply to the bot's previous messages to continue a conversation."""
             if not prompt:
-                await ctx.send("Please provide a prompt for Gemini!")
+                await ctx.reply("Please provide a prompt for Gemini!")
                 return
 
             user_current_prompt_text = prompt
@@ -149,7 +149,7 @@ class GeminiFeature:
                 )
 
             if not raw_ai_response_text:
-                await ctx.send(
+                await ctx.reply(
                     "Sorry, an unknown error occurred and no response was generated from Gemini."
                 )
                 return
@@ -198,11 +198,15 @@ class GeminiFeature:
                         message_to_send_discord = text_content_for_part
 
                 try:
-                    msg_obj = await ctx.send(message_to_send_discord)
+                    msg_obj = await ctx.reply(
+                        message_to_send_discord
+                    )  # Changed from ctx.send
                     sent_discord_messages.append(msg_obj)
                 except Exception as e:
                     print(f"Error sending Discord message part: {e}")
-                    await ctx.send(f"Error sending part of the response: {e}")
+                    await ctx.reply(
+                        f"Error sending part of the response: {e}"
+                    )  # Changed from ctx.send
 
             if sent_discord_messages and not is_error_response:
                 final_sent_message_id = sent_discord_messages[-1].id

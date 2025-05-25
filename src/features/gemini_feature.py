@@ -1,7 +1,7 @@
 import google.genai as genai
 from discord.ext import commands
 from config import ConfigManager
-from google.api_core import exceptions
+from google.genai import errors
 
 
 class GeminiFeature:
@@ -28,14 +28,13 @@ class GeminiFeature:
                 print(f"Gemini Feature: No text response returned: {response}")
                 return "Sorry, the AI did not return a text response."
 
-        except exceptions.NotFound as e:
-            print(f"Gemini Feature: Model not found: {e}")
-            return (
-                "Sorry, the specified Gemini model was not found or is not available."
-            )
-        except exceptions.GoogleAPIError as e:
-            print(f"Gemini Feature: Google API error: {e}")
-            return f"Sorry, a Google API error occurred: {e}"
+        except errors.APIError as e:
+            if e.code == 404:
+                print(f"Gemini Feature: Model not found: {e.message}")
+                return "Sorry, the specified Gemini model was not found or is not available."
+            else:
+                print(f"Gemini Feature: Google API error: {e.code} - {e.message}")
+                return f"Sorry, a Google API error occurred: {e.message}"
         except Exception as e:
             print(f"Gemini Feature: An unexpected error occurred: {e}")
             return "Sorry, an unexpected error occurred while communicating with the AI service."

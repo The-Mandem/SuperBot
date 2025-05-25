@@ -1,6 +1,7 @@
-import requests
+import google.genai as genai
 from discord.ext import commands
 from config import ConfigManager
+from google.api_core import exceptions
 
 
 class GeminiFeature:
@@ -8,66 +9,36 @@ class GeminiFeature:
         self.bot = bot
         self.config = ConfigManager()
         self.gemini_api_key = self.config.get_gemini_key()
-        self.gemini_model = "gemini-2.0-flash"
-        self.api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.gemini_model}:generateContent?key={self.gemini_api_key}"
+        self.gemini_model_name = "gemini-2.5-flash-preview-04-17-thinking"
+        self.client = genai.Client(api_key=self.gemini_api_key)
 
     def _make_gemini_request(self, prompt: str) -> str | None:
-        """Makes a request to the Gemini API and returns the text response."""
-        headers = {"Content-Type": "application/json"}
-        data = {"contents": [{"parts": [{"text": prompt}]}]}
+        """Makes a request to the Gemini API using the SDK and returns the text response."""
         response = None
 
         try:
-            response = requests.post(
-                self.api_url, headers=headers, json=data, timeout=120
-            )  # 120-second timeout
-            response.raise_for_status()  # Raises HTTPError for bad responses (4XX or 5XX)
-
-            response_json = response.json()
-
-            # Defensive parsing of the response
-            candidates = response_json.get("candidates")
-            if (
-                not candidates
-                or not isinstance(candidates, list)
-                or not candidates[0].get("content")
-            ):
-                print(f"Gemini Feature: Unexpected response structure: {response_json}")
-                return "Sorry, I received an unexpected response format from the AI."
-
-            parts = candidates[0]["content"].get("parts")
-            if not parts or not isinstance(parts, list) or not parts[0].get("text"):
-                print(f"Gemini Feature: Text part missing in response: {response_json}")
-                return "Sorry, I couldn't extract a text response from the AI."
-
-            return parts[0]["text"]
-
-        except requests.exceptions.HTTPError as e:
-            error_details = e.response.json() if e.response else str(e)
-            print(
-                f"Gemini Feature: HTTP Error {e.response.status_code if e.response else 'N/A'} - {error_details}"
+            response = self.client.models.generate_content(
+                model=self.gemini_model_name, contents=[prompt]
             )
-            # Try to extract a more user-friendly error from Gemini's response if available
-            gemini_error_message = "An internal error occurred with the AI service."
-            if e.response is not None:
-                try:
-                    error_data = e.response.json()
-                    if "error" in error_data and "message" in error_data["error"]:
-                        gemini_error_message = error_data["error"]["message"]
-                except ValueError:
-                    pass
-            return f"Sorry, I encountered an error with the AI service (HTTP {e.response.status_code if e.response else 'N/A'}). Details: {gemini_error_message}"
-        except requests.exceptions.RequestException as e:
-            print(f"Gemini Feature: Request failed: {e}")
+
+            # Check if response and text exist
+            if response and response.text:
+                return response.text
+            else:
+                print(f"Gemini Feature: No text response returned: {response}")
+                return "Sorry, the AI did not return a text response."
+
+        except exceptions.NotFound as e:
+            print(f"Gemini Feature: Model not found: {e}")
             return (
-                "Sorry, I couldn't connect to the AI service. Please try again later."
+                "Sorry, the specified Gemini model was not found or is not available."
             )
-        except (IndexError, KeyError, TypeError) as e:
-            response_text = response.text if response is not None else "N/A"
-            print(
-                f"Gemini Feature: Error parsing Gemini response: {e}. Response: {response_text}"
-            )
-            return "Sorry, I received an unparseable response from the AI."
+        except exceptions.GoogleAPIError as e:
+            print(f"Gemini Feature: Google API error: {e}")
+            return f"Sorry, a Google API error occurred: {e}"
+        except Exception as e:
+            print(f"Gemini Feature: An unexpected error occurred: {e}")
+            return "Sorry, an unexpected error occurred while communicating with the AI service."
 
     async def setup(self):
         """Registers the !gemini command."""

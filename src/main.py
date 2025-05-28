@@ -36,10 +36,13 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_message(message: Message) -> None:
+    config = ConfigManager()
     # Ignore messages from the bot itself to prevent loops
     if message.author == bot.user:
         return
-
+    # Prod bot ignores tester channel
+    if message.channel.id == 1372344802468954183 and config.get_app_env() == "prod":
+        return
     # Basic logging (can be expanded or moved to a dedicated logging module)
     username = str(message.author)
     user_message = message.content

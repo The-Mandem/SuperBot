@@ -41,7 +41,12 @@ async def on_message(message: Message) -> None:
     if message.author == bot.user:
         return
     # Prod bot ignores tester channel
-    if message.channel.id == 1372344802468954183 and config.get_app_env() == "prod":
+    tester_channel_id = config.get_tester_channel_id()
+    if (
+        tester_channel_id is not None
+        and message.channel.id == tester_channel_id
+        and config.get_app_env() == "prod"
+    ):
         return
     # Basic logging (can be expanded or moved to a dedicated logging module)
     username = str(message.author)

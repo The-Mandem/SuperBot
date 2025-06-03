@@ -96,6 +96,22 @@ class ConfigManager:
                 f"Checked .env at '{self._dotenv_path}' and system environment variables."
             )
 
+        # Load Tester Channel ID
+        self._tester_channel_id = None
+        tester_channel_id_str = os.getenv("TESTER_CHANNEL_ID")
+        if tester_channel_id_str:
+            try:
+                self._tester_channel_id = int(tester_channel_id_str)
+                print(f"INFO: Loaded TESTER_CHANNEL_ID: {self._tester_channel_id}")
+            except ValueError:
+                print(
+                    f"WARNING: TESTER_CHANNEL_ID '{tester_channel_id_str}' is not a valid integer. Ignoring."
+                )
+        else:
+            print(
+                "INFO: TESTER_CHANNEL_ID environment variable not set. The ignore_channel_in_prod decorator will not function."
+            )
+
         ConfigManager._initialized = True
 
     def get_discord_token(self) -> str:
@@ -123,3 +139,7 @@ class ConfigManager:
                 "Gemini key accessed before initialization or initialization failed."
             )
         return self._gemini_key
+
+    def get_tester_channel_id(self) -> int | None:
+        """Returns the loaded tester channel ID or None if not set/invalid."""
+        return self._tester_channel_id

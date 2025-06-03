@@ -5,6 +5,7 @@ import discord
 import shutil
 from discord.ext import commands
 from discord import Message
+from utils import ignore_channel_in_prod
 
 
 class InstagramFeature:
@@ -134,6 +135,7 @@ class InstagramFeature:
 
         return sent_media
 
+    @ignore_channel_in_prod()
     async def on_instagram_message(self, message: Message):
         """Listener for messages, checks for Instagram links."""
         if message.author == self.bot.user:

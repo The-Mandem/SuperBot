@@ -8,30 +8,45 @@ from features.bqq_feature import NoBqqFeature
 
 intents: Intents = Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
+
+
+# We create a custom Bot class to override the setup_hook method.
+# This is the recommended way to handle one-time async setup.
+class MyBot(commands.Bot):
+    async def setup_hook(self) -> None:
+        """This hook is called once when the bot is setting up, before login."""
+        print("Initializing features...")
+
+        # Instagram Feature
+        instagram_feature = InstagramFeature(self)
+        await instagram_feature.setup()
+
+        # Gemini Feature
+        gemini_feature = GeminiFeature(self)
+        await gemini_feature.setup()
+
+        # Postman/API caller Feature
+        postman_feature = Postman(self)
+        await postman_feature.setup()
+
+        # Bqq feature
+        bqq_feature = NoBqqFeature(self)
+        await bqq_feature.setup()
+
+        print("All features initialized and set up.")
+
+
+bot = MyBot(command_prefix="!", intents=intents)
 
 
 @bot.event
 async def on_ready() -> None:
+    """
+    This event is called when the bot has successfully connected to Discord.
+    It can be called multiple times (e.g., on reconnect), so one-time setup
+    should not be placed here.
+    """
     print(f"{bot.user} is now running!")
-
-    # Instagram Feature
-    instagram_feature = InstagramFeature(bot)
-    await instagram_feature.setup()
-
-    # Gemini Feature
-    gemini_feature = GeminiFeature(bot)
-    await gemini_feature.setup()
-
-    # Postman/API caller Feature
-    postman_feature = Postman(bot)
-    await postman_feature.setup()
-
-    # Bqq feature
-    bqq_feature = NoBqqFeature(bot)
-    await bqq_feature.setup()
-
-    print("All features initialized and set up.")
 
 
 @bot.event

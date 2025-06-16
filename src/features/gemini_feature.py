@@ -4,6 +4,7 @@ from discord.ext import commands
 from discord import Message
 from config import ConfigManager
 from collections import OrderedDict
+from typing import List
 
 
 class GeminiFeature:
@@ -41,10 +42,17 @@ class GeminiFeature:
             else None
         )
 
+        # Explicitly create a new list to help the type checker
+        # recognize the elements as compatible with ContentUnion,
+        # addressing the list invariance issue.
+        contents_for_api: List[types.ContentUnion] = [
+            item for item in conversation_contents
+        ]
+
         try:
             response = self.client.models.generate_content(
                 model=self.gemini_model_name,
-                contents=conversation_contents,
+                contents=contents_for_api,  # Use the new list
                 config=generation_config,
             )
 

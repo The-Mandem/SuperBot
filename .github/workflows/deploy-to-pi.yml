@@ -63,6 +63,14 @@ jobs:
         with:
           fetch-depth: 0 # Fetches all history for git reset --hard
 
+      - name: Establish WireGuard Connection
+        uses: egor-tensin/setup-wireguard@v2
+        with:
+          config: ${{ secrets.WIREGUARD_CONFIG }}
+          # This will ensure that all subsequent steps in the job
+          # will have their traffic routed through the VPN.
+          # The action also outputs the connection status.
+
       - name: Deploy to Raspberry Pi and Restart Service
         uses: appleboy/ssh-action@v1.2.2
         with:

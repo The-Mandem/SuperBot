@@ -64,6 +64,7 @@ jobs:
           fetch-depth: 0 # Fetches all history for git reset --hard
 
       - name: Establish WireGuard Connection
+        timeout-minutes: 2
         uses: egor-tensin/setup-wireguard@v1
         with:
           endpoint: ${{ secrets.WG_ENDPOINT }}

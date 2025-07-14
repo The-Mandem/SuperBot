@@ -1,4 +1,4 @@
-name: Build, Lint, and Deploy Discord Bot
+name: Build and Lint Discord Bot
 
 on:
   push:
@@ -6,8 +6,7 @@ on:
       - main
   pull_request:
     branches:
-      - main # Lint on PRs targeting main
-  workflow_dispatch: # Allows manual triggering
+      - main
 
 jobs:
   build-and-lint:
@@ -24,135 +23,11 @@ jobs:
           python-version: '3.13'
           cache: 'pip'
 
-      - name: Install Ruff and project dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff
+      - name: Install Ruff
+        run: pip install ruff
 
-          if [ -f requirements.txt ]; then
-            echo "Installing dependencies from requirements.txt..."
-            pip install -r requirements.txt
-          fi
+      - name: Lint with Ruff
+        run: ruff check .
 
-      - name: Lint with Ruff (default settings)
-        run: |
-          # Check for linting errors using Ruff's default rules.
-          # This command will fail the build if any linting issues are found.
-          ruff check .
-
-      - name: Check formatting with Ruff (default settings)
-        run: |
-          # Check if code is formatted according to Ruff's default formatter (Black-compatible).
-          # This command will fail the build if any files need reformatting.
-          ruff format --check .
-
-      - name: Placeholder for Tests
-        run: echo "No tests configured yet."
-
-  deploy:
-    name: Deploy to Pi
-    runs-on: ubuntu-latest
-    needs: build-and-lint # Only run if build-and-lint job succeeds
-    # This condition is important to ensure deployment only happens on a push to main,
-    # not on pull requests.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetches all history for git reset --hard
-
-      - name: Establish WireGuard Connection
-        timeout-minutes: 2
-        uses: egor-tensin/setup-wireguard@v1
-        with:
-          endpoint: ${{ secrets.WG_ENDPOINT }}
-          endpoint_public_key: ${{ secrets.WG_ENDPOINT_PUBLIC_KEY }}
-          private_key: ${{ secrets.WG_PRIVATE_KEY }}
-          allowed_ips: ${{ secrets.WG_ALLOWED_IPS }}
-          ips: ${{ secrets.WG_IPS }}
-          # Omit the line below if you don't use a preshared key
-          preshared_key: ${{ secrets.WG_PRESHARED_KEY }}
-
-      - name: Deploy to Raspberry Pi and Restart Service
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.PI_HOST }}
-          username: ${{ secrets.PI_USER }}
-          key: ${{ secrets.PI_SSH_KEY }}
-          port: ${{ secrets.PI_PORT || 22 }}
-          script: |
-            set -e
-
-            BOT_DIR="${{ secrets.BOT_REPO_PATH }}"
-            SYSTEMD_SERVICE="${{ secrets.SYSTEMD_SERVICE_NAME }}"
-            PI_VENV_PYTHON_EXEC="$BOT_DIR/.venv/bin/python"
-            # System python to create venv if it doesn't exist (e.g., python3, python3.11)
-            # This should be a version capable of creating a venv for your target Python.
-            PI_SYSTEM_PYTHON_FOR_VENV="python3"
-
-            echo "--- Navigating to bot directory: $BOT_DIR ---"
-            cd "$BOT_DIR" || { echo "🚨 ERROR: Failed to cd to $BOT_DIR"; exit 1; }
-
-            echo "--- Fetching latest changes from Git (main branch) ---"
-            git fetch origin main
-            echo "--- Resetting local main branch to remote main branch (discarding local changes) ---"
-            git reset --hard origin/main
-
-            echo "--- Ensuring Python virtual environment exists and is set up ---"
-            if [ ! -f "$PI_VENV_PYTHON_EXEC" ]; then
-              echo "Virtual environment Python not found at $PI_VENV_PYTHON_EXEC. Creating venv..."
-              # Ensure the .venv directory itself doesn't exist or is empty before creating
-              rm -rf "$BOT_DIR/.venv"
-              "$PI_SYSTEM_PYTHON_FOR_VENV" -m venv "$BOT_DIR/.venv"
-              echo "Virtual environment created."
-            else
-              echo "Virtual environment Python found at $PI_VENV_PYTHON_EXEC."
-            fi
-
-            echo "--- Installing/updating Python dependencies using $PI_VENV_PYTHON_EXEC ---"
-            "$PI_VENV_PYTHON_EXEC" -m pip install --upgrade pip
-            # Ensure requirements.txt exists on the Pi as well
-            if [ -f "$BOT_DIR/requirements.txt" ]; then
-              "$PI_VENV_PYTHON_EXEC" -m pip install -r "$BOT_DIR/requirements.txt"
-            else
-              echo "No requirements.txt found in $BOT_DIR, skipping dependency installation."
-            fi
-
-
-            echo "--- Restarting systemd service: $SYSTEMD_SERVICE ---"
-            sudo systemctl restart "$SYSTEMD_SERVICE"
-
-            echo "--- Waiting for service to stabilize and checking status (up to 30 seconds) ---"
-            RETRY_COUNT=0
-            MAX_RETRIES=6
-            RETRY_DELAY=5
-            SERVICE_ACTIVE=false
-
-            sleep 5 # Initial short delay for service to attempt startup
-
-            until [ "$SERVICE_ACTIVE" = true ] || [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; do
-              RETRY_COUNT=$((RETRY_COUNT+1))
-              echo "Checking service status... (Attempt $RETRY_COUNT/$MAX_RETRIES)"
-              if sudo systemctl is-active --quiet "$SYSTEMD_SERVICE"; then
-                SERVICE_ACTIVE=true
-                echo "✅ Service '$SYSTEMD_SERVICE' is active and running."
-              else
-                if [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; then
-                  echo "Service not active yet. Retrying in $RETRY_DELAY seconds..."
-                  sleep "$RETRY_DELAY"
-                fi
-              fi
-            done
-
-            if [ "$SERVICE_ACTIVE" != true ]; then
-              echo "🚨 ERROR: Service '$SYSTEMD_SERVICE' FAILED to start or is not active after $MAX_RETRIES attempts."
-              echo "--- Displaying last 50 log lines from journalctl ---"
-              sudo journalctl -u "$SYSTEMD_SERVICE" -n 50 --no-pager
-              echo "--- Displaying full service status ---"
-              sudo systemctl status "$SYSTEMD_SERVICE" --no-pager
-              exit 1 # Fail the GitHub Actions job
-            fi
-
-            echo "--- Deployment successful! ---"
+      - name: Check formatting with Ruff
+        run: ruff format --check .

@@ -12,7 +12,7 @@ class GeminiFeature:
         self.bot = bot
         self.config = ConfigManager()
         self.gemini_api_key = self.config.get_gemini_key()
-        self.gemini_model_name = "gemini-2.5-flash-preview-04-17-thinking"
+        self.gemini_model_name = "gemini-2.5-flash"
         self.client = genai.Client(api_key=self.gemini_api_key)
 
         self.conversations: OrderedDict[int, list[types.Content]] = OrderedDict()

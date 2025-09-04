@@ -187,7 +187,7 @@ class GeminiFeature:
                 if replied_message.author == self.bot.user:
                     retrieved_history = self.conversations.get(replied_message.id)
                     if retrieved_history:
-                        current_conversation_history = list(replied_message)
+                        current_conversation_history = list(retrieved_history)
                         self.conversations.move_to_end(replied_message.id)
 
             current_conversation_history.append(

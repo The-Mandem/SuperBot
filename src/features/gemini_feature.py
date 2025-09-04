@@ -7,6 +7,7 @@ from collections import OrderedDict
 from typing import List
 from datetime import datetime, timezone, timedelta
 
+
 class GeminiFeature:
     def __init__(self, bot: commands.Bot):
         self.bot = bot

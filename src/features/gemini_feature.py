@@ -145,9 +145,9 @@ class GeminiFeature:
                 "Here is a list of messages from a Discord channel. "
                 "Each entry is a list of two items: [sender, message]. "
                 "The list is ordered from earliest to latest. "
-                "Please provide an overall summary of what the conversation was about, "
+                "Please provide a short overall summary of what the conversation was about, "
                 "and summarize what each person argued for or contributed. "
-                "Keep your response concise and brief."
+                "Keep your response concise and brief, it MUST be under 2000 characters in total. Sacrifice detail if needed to stay under this limit. This limit is non negotiable."
                 f"{messages_2d}"
             )
 

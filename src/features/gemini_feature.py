@@ -123,12 +123,20 @@ class GeminiFeature:
 
             messages_2d: list[list[str]] = []
 
-            async for msg in ctx.channel.history(limit=1000, oldest_first=True):
-                if msg.created_at >= cutoff:
-                    username = msg.author.display_name
-                    if username in ("ChatArchive", "BNBD"):
-                        continue
-                    messages_2d.append([username, msg.content])
+            async for msg in ctx.channel.history(limit=1000):
+                # We process newest messages first. If a message is older than the cutoff,
+                # all subsequent messages will also be older, so we can stop early.
+                if msg.created_at < cutoff:
+                    break
+
+                username = msg.author.display_name
+                if username in ("ChatArchive", "BNBD"):
+                    continue
+                messages_2d.append([username, msg.content])
+
+            # Since we fetched newest-to-oldest, we must reverse the list
+            # so it's in chronological order (oldest-to-newest) for the AI.
+            messages_2d.reverse()
 
             print(f"Total messages included: {len(messages_2d)}")
 

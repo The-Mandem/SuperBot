@@ -5,6 +5,7 @@ from discord import Message
 from config import ConfigManager
 from collections import OrderedDict
 from typing import List
+from datetime import datetime, timezone, timedelta
 
 
 class GeminiFeature:
@@ -114,6 +115,54 @@ class GeminiFeature:
     async def setup(self):
         """Registers the !gemini command."""
 
+        @commands.command(name="rundown")
+        async def rundown_command(ctx: commands.Context, minutes: int = 10):
+            """Fetches all messages in the current channel from the past x minutes and asks Gemini for a summary and what each person argued for."""
+            minutes = max(1, min(minutes, 2000))
+            cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+
+            messages_2d: list[list[str]] = []
+
+            async for msg in ctx.channel.history(limit=1000, oldest_first=True):
+                if msg.created_at >= cutoff:
+                    username = msg.author.display_name
+                    if username in ("ChatArchive", "BNBD"):
+                        continue
+                    messages_2d.append([username, msg.content])
+
+            print(f"Total messages included: {len(messages_2d)}")
+
+            # Prepare prompt for Gemini
+            prompt = (
+                "Here is a list of messages from a Discord channel. "
+                "Each entry is a list of two items: [sender, message]. "
+                "The list is ordered from earliest to latest. "
+                "Please provide an overall summary of what the conversation was about, "
+                "and summarize what each person argued for or contributed. "
+                "Keep your response concise and brief."
+                f"{messages_2d}"
+            )
+
+            system_instruction = "Summarize the conversation and each participant's arguments based on the provided message list."
+            async with ctx.typing():
+                summary = self._make_gemini_request(
+                    [types.Content(role="user", parts=[types.Part(text=prompt)])],
+                    system_instruction,
+                )
+
+            if not summary:
+                await ctx.reply("Sorry, Gemini did not return a summary.")
+                return
+
+            if len(summary) > 1900:
+                summary = summary[:1900] + "..."
+
+            await ctx.reply(
+                f"Rundown summary for the {len(messages_2d)} messages from the past {minutes} minutes:\n{summary}"
+            )
+
+        self.bot.add_command(rundown_command)
+
         @commands.command(name="gemini")
         async def gemini_command(ctx: commands.Context, *, prompt: str):
             """Talk to the Gemini AI. Reply to the bot's previous messages to continue a conversation."""
@@ -130,7 +179,7 @@ class GeminiFeature:
                 if replied_message.author == self.bot.user:
                     retrieved_history = self.conversations.get(replied_message.id)
                     if retrieved_history:
-                        current_conversation_history = list(retrieved_history)
+                        current_conversation_history = list(replied_message)
                         self.conversations.move_to_end(replied_message.id)
 
             current_conversation_history.append(

@@ -3,6 +3,7 @@ from discord.ext import commands
 from config import ConfigManager
 from features.instagram_feature import InstagramFeature
 from features.gemini_feature import GeminiFeature
+from features.rundown_feature import RundownFeature
 from features.postman_feature import Postman
 from features.bqq_feature import NoBqqFeature
 
@@ -24,6 +25,10 @@ class MyBot(commands.Bot):
         # Gemini Feature
         gemini_feature = GeminiFeature(self)
         await gemini_feature.setup()
+
+        # Rundown Feature
+        rundown_feature = RundownFeature(self)
+        await rundown_feature.setup()
 
         # Postman/API caller Feature
         postman_feature = Postman(self)

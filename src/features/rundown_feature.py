@@ -67,8 +67,7 @@ class RundownFeature:
                         for rating in response.candidates[0].safety_ratings
                         if rating.probability
                         and rating.category
-                        and rating.probability.value
-                        >= types.HarmProbability.LOW.value  # Added checks for rating.probability and rating.category
+                        and rating.probability.value >= types.HarmProbability.LOW.value
                     ]
                     if problematic_ratings:
                         safety_ratings_info = (
@@ -91,9 +90,7 @@ class RundownFeature:
                     f"Gemini Feature: Model not found or API endpoint issue: {e.message}"
                 )
                 return "Sorry, the specified Gemini model was not found or there's an issue with the API endpoint."
-            # Removed the check for resource_exhausted as it's not a valid attribute per error message and documentation
             else:
-                # This block will now also handle potential resource exhaustion errors if they come as a general APIError
                 print(
                     f"Gemini Feature: Google API error: {e.code if hasattr(e, 'code') else 'Unknown code'} - {e.message}"
                 )
@@ -118,8 +115,7 @@ class RundownFeature:
         value = int(match.group(1))
         suffix = (match.group(2) or "m").lower()
 
-        # sane upper bound — tweak as you like
-        MAX_HOURS = 24 * 7  # 7 days
+        MAX_HOURS = 24 * 7
         if suffix == "h":
             if value > MAX_HOURS:
                 raise ValueError(f"Duration too large. Max is {MAX_HOURS}h.")
@@ -127,7 +123,6 @@ class RundownFeature:
             unit = "hour" if value == 1 else "hours"
             delta = timedelta(hours=value)
         else:
-            # minutes path
             if value > MAX_HOURS * 60:
                 raise ValueError(f"Duration too large. Max is {MAX_HOURS * 60}m.")
             amount = value
@@ -143,7 +138,7 @@ class RundownFeature:
         async def rundown_command(ctx: commands.Context, duration: str = "10m"):
             """
             Fetch messages from the past <duration> and summarize.
-            Examples: !rundown 60m, !rundown 2h, !rundown 45  (45 defaults to minutes)
+            Examples: !rundown 60m, !rundown 2h, !rundown 45 (defaults to minutes)
             """
             try:
                 delta, amount, unit = RundownFeature._parse_duration_to_timedelta(
@@ -154,38 +149,42 @@ class RundownFeature:
                 return
 
             cutoff = datetime.now(timezone.utc) - delta
-
             messages_2d: list[list[str]] = []
 
             async for msg in ctx.channel.history(limit=1000):
-                # We process newest messages first. If a message is older than the cutoff,
-                # all subsequent messages will also be older, so we can stop early.
                 if msg.created_at < cutoff:
                     break
 
-                username = msg.author.display_name
-                if username in ("ChatArchive", "BNBD"):
+                if msg.content.strip().lower().startswith(
+                    "!rundown"
+                ) or msg.author.display_name in ("ChatArchive", "BNBD"):
                     continue
-                messages_2d.append([username, msg.content])
 
-            # Since we fetched newest-to-oldest, we must reverse the list
-            # so it's in chronological order (oldest-to-newest) for the AI.
+                messages_2d.append([msg.author.display_name, msg.content])
+
             messages_2d.reverse()
+
+            if not messages_2d:
+                await ctx.reply(
+                    f"No messages found in the last {amount} {unit} to summarize."
+                )
+                return
 
             print(f"Total messages included: {len(messages_2d)}")
 
-            # Prepare prompt for Gemini
             prompt = (
-                "Here is a list of messages from a Discord channel. "
-                "Each entry is a list of two items: [sender, message]. "
-                "The list is ordered from earliest to latest. "
-                "Please provide a short overall summary of what the conversation was about, "
-                "and summarize what each person argued for or contributed. "
-                "Keep your response concise and brief, it MUST be under 2000 characters in total. Sacrifice detail if needed to stay under this limit. This limit is non negotiable."
-                f"{messages_2d}"
+                "You are a Discord summarization bot. Your task is to provide a very brief, high-level summary of the following conversation. "
+                "The entire response must be extremely concise and well under 1000 characters. "
+                "First, write a one or two-sentence general summary. Then, list the key topics or questions discussed as bullet points. "
+                "Do not summarize each person's contribution unless it was a major, conversation-defining point. "
+                f"Here is the conversation history, where each item is [sender, message]:\n\n{messages_2d}"
             )
 
-            system_instruction = "Summarize the conversation and each participant's arguments based on the provided message list."
+            system_instruction = (
+                "Create an extremely brief summary of the key topics in the provided Discord messages. "
+                "The entire output must be very short. Use a single general summary sentence followed by bullet points of topics."
+            )
+
             async with ctx.typing():
                 summary = self._make_gemini_request(
                     [types.Content(role="user", parts=[types.Part(text=prompt)])],
@@ -193,7 +192,7 @@ class RundownFeature:
                 )
 
             if not summary:
-                await ctx.reply("Sorry, Gemini did not return a summary.")
+                await ctx.reply("Sorry, the AI did not return a summary.")
                 return
 
             if len(summary) > 1900:

@@ -25,26 +25,22 @@ class GeminiFeature:
         system_instruction_text: str | None,
     ) -> str | None:
         """
-        Makes a request to the Gemini API with the given conversation history and system instruction.
+        Makes a request to the Gemini API with the given conversation history and system instruction,
+        with grounding enabled.
         Returns the text response or an error message string.
         """
         if not conversation_contents:
             print("Gemini Feature: Conversation contents list is empty.")
             return "Sorry, there's no conversation to continue with."
 
-        gen_config_params = {}
+        google_search_tool = types.Tool(google_search=types.GoogleSearch())
+
+        gen_config_params = {"tools": [google_search_tool]}
         if system_instruction_text:
             gen_config_params["system_instruction"] = system_instruction_text
 
-        generation_config = (
-            types.GenerateContentConfig(**gen_config_params)
-            if gen_config_params
-            else None
-        )
+        generation_config = types.GenerateContentConfig(**gen_config_params)
 
-        # Explicitly create a new list to help the type checker
-        # recognize the elements as compatible with ContentUnion,
-        # addressing the list invariance issue.
         contents_for_api: List[types.ContentUnion] = [
             item for item in conversation_contents
         ]
@@ -52,7 +48,7 @@ class GeminiFeature:
         try:
             response = self.client.models.generate_content(
                 model=self.gemini_model_name,
-                contents=contents_for_api,  # Use the new list
+                contents=contents_for_api,
                 config=generation_config,
             )
 
@@ -71,8 +67,7 @@ class GeminiFeature:
                         for rating in response.candidates[0].safety_ratings
                         if rating.probability
                         and rating.category
-                        and rating.probability.value
-                        >= types.HarmProbability.LOW.value  # Added checks for rating.probability and rating.category
+                        and rating.probability.value >= types.HarmProbability.LOW.value
                     ]
                     if problematic_ratings:
                         safety_ratings_info = (
@@ -95,9 +90,7 @@ class GeminiFeature:
                     f"Gemini Feature: Model not found or API endpoint issue: {e.message}"
                 )
                 return "Sorry, the specified Gemini model was not found or there's an issue with the API endpoint."
-            # Removed the check for resource_exhausted as it's not a valid attribute per error message and documentation
             else:
-                # This block will now also handle potential resource exhaustion errors if they come as a general APIError
                 print(
                     f"Gemini Feature: Google API error: {e.code if hasattr(e, 'code') else 'Unknown code'} - {e.message}"
                 )

@@ -3,7 +3,6 @@ from google.genai import types, errors
 from discord.ext import commands
 from discord import Message
 from config import ConfigManager
-from collections import OrderedDict
 from typing import List
 
 
@@ -15,8 +14,6 @@ class GeminiFeature:
         self.gemini_model_name = "gemini-2.5-flash"
         self.client = genai.Client(api_key=self.gemini_api_key)
 
-        self.conversations: OrderedDict[int, list[types.Content]] = OrderedDict()
-        self.MAX_ACTIVE_CONVERSATIONS = 50
         self.MAX_CONVERSATION_HISTORY_MESSAGES = 50
 
     def _make_gemini_request(
@@ -99,11 +96,6 @@ class GeminiFeature:
             print(f"Gemini Feature: An unexpected error occurred: {e}")
             return "Sorry, an unexpected error occurred while communicating with the AI service."
 
-    def _cleanup_old_conversations(self):
-        """Removes the oldest conversation histories if exceeding MAX_ACTIVE_CONVERSATIONS."""
-        while len(self.conversations) > self.MAX_ACTIVE_CONVERSATIONS:
-            self.conversations.popitem(last=False)
-
     async def setup(self):
         """Registers the !ask command with conversation context."""
 
@@ -118,14 +110,44 @@ class GeminiFeature:
             system_instruction = "Please keep your response concise and brief."
             current_conversation_history: list[types.Content] = []
 
+            # Dynamically build conversation history from the reply chain
             if ctx.message.reference and ctx.message.reference.resolved:
-                replied_message: Message = ctx.message.reference.resolved  # type: ignore
-                if replied_message.author == self.bot.user:
-                    retrieved_history = self.conversations.get(replied_message.id)
-                    if retrieved_history:
-                        current_conversation_history = list(retrieved_history)
-                        self.conversations.move_to_end(replied_message.id)
+                print(
+                    "Gemini Feature: Found a reply. Building conversation history from the chain."
+                )
+                current_message = ctx.message.reference.resolved
 
+                # The resolved attribute can be a Message or a DeletedReferencedMessage.
+                # We only care about actual messages.
+                while isinstance(current_message, Message):
+                    # Determine the role based on the author of the message
+                    author_role = (
+                        "model" if current_message.author == self.bot.user else "user"
+                    )
+
+                    print(
+                        f"Gemini Feature: Adding message from '{author_role}' with content: '{current_message.content[:70]}...'"
+                    )
+
+                    current_conversation_history.insert(
+                        0,
+                        types.Content(
+                            role=author_role,
+                            parts=[types.Part.from_text(text=current_message.content)],
+                        ),
+                    )
+
+                    # Traverse up the reply chain.
+                    if current_message.reference and isinstance(
+                        current_message.reference.resolved, Message
+                    ):
+                        current_message = current_message.reference.resolved
+                    else:
+                        # End of the chain
+                        print("Gemini Feature: Reached the end of the reply chain.")
+                        break
+
+            # Add the user's current prompt as the last message in the history
             current_conversation_history.append(
                 types.Content(
                     role="user",
@@ -133,6 +155,7 @@ class GeminiFeature:
                 )
             )
 
+            # Trim the history if it exceeds the maximum length
             if (
                 len(current_conversation_history)
                 > self.MAX_CONVERSATION_HISTORY_MESSAGES
@@ -140,6 +163,13 @@ class GeminiFeature:
                 current_conversation_history = current_conversation_history[
                     -self.MAX_CONVERSATION_HISTORY_MESSAGES :
                 ]
+                print(
+                    f"Gemini Feature: Conversation history trimmed to the last {self.MAX_CONVERSATION_HISTORY_MESSAGES} messages."
+                )
+
+            print(
+                f"Gemini Feature: Sending {len(current_conversation_history)} message(s) to the Gemini API."
+            )
 
             async with ctx.typing():
                 raw_ai_response_text = await self.bot.loop.run_in_executor(
@@ -171,7 +201,6 @@ class GeminiFeature:
             else:
                 display_text_parts.append(raw_ai_response_text)
 
-            sent_discord_messages: list[Message] = []
             for i, text_content_for_part in enumerate(display_text_parts):
                 if not text_content_for_part.strip():
                     continue
@@ -199,34 +228,13 @@ class GeminiFeature:
                         message_to_send_discord = text_content_for_part
 
                 try:
-                    msg_obj = await ctx.reply(
-                        message_to_send_discord
-                    )  # Changed from ctx.send
-                    sent_discord_messages.append(msg_obj)
+                    # Reply to the user's command to allow for easy continuation of the conversation chain
+                    await ctx.reply(message_to_send_discord)
                 except Exception as e:
                     print(f"Error sending Discord message part: {e}")
-                    await ctx.reply(
-                        f"Error sending part of the response: {e}"
-                    )  # Changed from ctx.send
-
-            if sent_discord_messages and not is_error_response:
-                final_sent_message_id = sent_discord_messages[-1].id
-
-                history_to_store = list(current_conversation_history)
-                history_to_store.append(
-                    types.Content(
-                        role="model",
-                        parts=[types.Part.from_text(text=raw_ai_response_text)],
-                    )
-                )
-
-                if len(history_to_store) > self.MAX_CONVERSATION_HISTORY_MESSAGES:
-                    history_to_store = history_to_store[
-                        -self.MAX_CONVERSATION_HISTORY_MESSAGES :
-                    ]
-
-                self.conversations[final_sent_message_id] = history_to_store
-                self._cleanup_old_conversations()
+                    await ctx.reply(f"Error sending part of the response: {e}")
 
         self.bot.add_command(gemini_command)
-        print("Gemini feature loaded and command registered with conversation context.")
+        print(
+            "Gemini feature loaded and command registered with dynamic conversation context."
+        )

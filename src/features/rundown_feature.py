@@ -173,16 +173,17 @@ class RundownFeature:
             print(f"Total messages included: {len(messages_2d)}")
 
             prompt = (
-                "You are a Discord summarization bot. Your task is to provide a very brief, high-level summary of the following conversation. "
-                "The entire response must be extremely concise and well under 1000 characters. "
-                "First, write a one or two-sentence general summary. Then, list the key topics or questions discussed as bullet points. "
-                "Do not summarize each person's contribution unless it was a major, conversation-defining point. "
+                "You are a Discord summarization bot. Provide a concise summary of the conversation, "
+                "highlighting the main topics discussed and who contributed to each. "
+                "Keep the overall summary brief, aiming for readability. "
+                "Use bullet points to mention key speakers and their main points. "
+                "The entire response should be under 1200 characters. "
                 f"Here is the conversation history, where each item is [sender, message]:\n\n{messages_2d}"
             )
 
             system_instruction = (
-                "Create an extremely brief summary of the key topics in the provided Discord messages. "
-                "The entire output must be very short. Use a single general summary sentence followed by bullet points of topics."
+                "Summarize the key topics and associated speakers from the provided Discord messages concisely. "
+                "Prioritize readability with a brief overview and bulleted speaker contributions."
             )
 
             async with ctx.typing():

@@ -125,6 +125,30 @@ class GeminiFeature:
             system_instruction = "Please keep your response concise and brief."
             current_conversation_history: list[types.Content] = []
 
+            # Print reference object for debugging
+            thread = []
+            latest_message = ctx.message
+
+            while True:
+                thread.append(
+                    f"[{latest_message.created_at.strftime('%Y-%m-%d %H:%M:%S')}] "
+                    f"{latest_message.author}: {latest_message.content}"
+                )
+
+                if not latest_message.reference:
+                    break
+
+                ref = latest_message.reference
+                if ref and ref.message_id:
+                    latest_message = await ctx.channel.fetch_message(ref.message_id)
+                else:
+                    break
+
+            if thread and len(thread) > 0:
+                thread_history = "\n".join(reversed(thread))
+                print(f"Thread history: {thread_history}")
+                user_current_prompt_text = f"This is the thread history that you are taking into context:\n{thread_history}\n\nNow responding to: {user_current_prompt_text}. if it makes sense to reply with the thread in context, do so"
+
             if ctx.message.reference and ctx.message.reference.resolved:
                 replied_message: Message = ctx.message.reference.resolved  # type: ignore
                 if replied_message.author == self.bot.user:

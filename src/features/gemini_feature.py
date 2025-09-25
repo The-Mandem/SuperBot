@@ -143,7 +143,7 @@ class GeminiFeature:
                     latest_message = await ctx.channel.fetch_message(ref.message_id)
                 else:
                     break
-            
+
             if thread and len(thread) > 0:
                 thread_history = "\n".join(reversed(thread))
                 print(f"Thread history: {thread_history}")

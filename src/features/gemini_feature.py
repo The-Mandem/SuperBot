@@ -144,9 +144,8 @@ class GeminiFeature:
                 else:
                     break
             
-            # Add thread history to the prompt if it exists
             if thread and len(thread) > 0:
-                thread_history = "\n".join(reversed(thread))  # Chronological order
+                thread_history = "\n".join(reversed(thread))
                 print(f"Thread history: {thread_history}")
                 user_current_prompt_text = f"This is the thread history that you are taking into context:\n{thread_history}\n\nNow responding to: {user_current_prompt_text}. if it makes sense to reply with the thread in context, do so"
 

@@ -51,7 +51,7 @@ class ArabicTranslateFeature:
                 return
 
             # Detect Arabic script
-            if re.search(r'[\u0600-\u06FF]', message.content):
+            if re.search(r"[\u0600-\u06FF]", message.content):
                 translated_text = await self.bot.loop.run_in_executor(
                     None, self._translate_with_gemini, message.content
                 )

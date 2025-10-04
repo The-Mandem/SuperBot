@@ -56,11 +56,14 @@ class ArabicTranslateFeature:
                     func=self._translate_with_gemini, args=(message.content,)
                 )
 
-                if translated_text:
-                    try:
-                        await message.reply(f"🌍 Translation:\n{translated_text}")
-                    except Exception as e:
-                        print(f"ArabicTranslateFeature: Error replying: {e}")
+                if translated_text is None:
+                    print("Translation failed")
+                    return
+
+                try:
+                    await message.reply(f"🌍 Translation:\n{translated_text}")
+                except Exception as e:
+                    print(f"ArabicTranslateFeature: Error replying: {e}")
 
             # Allow commands to still work
             await self.bot.process_commands(message)

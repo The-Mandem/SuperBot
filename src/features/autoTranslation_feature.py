@@ -13,6 +13,7 @@ class ArabicTranslateFeature:
         self.gemini_api_key = self.config.get_gemini_key()
         self.gemini_model_name = "gemini-2.5-flash"
         self.client = genai.Client(api_key=self.gemini_api_key)
+        self.arabic_pattern = re.compile(r"[\u0600-\u06FF]")
 
     def _translate_with_gemini(self, text: str) -> str | None:
         """Send Arabic text to Gemini and return English translation."""
@@ -50,8 +51,7 @@ class ArabicTranslateFeature:
             if message.author.bot:
                 return
 
-            # Detect Arabic script
-            if re.search(r"[\u0600-\u06FF]", message.content):
+            if self.arabic_pattern.search(message.content):
                 translated_text = await self.bot.loop.run_in_executor(
                     None, self._translate_with_gemini, message.content
                 )

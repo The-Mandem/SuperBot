@@ -53,7 +53,7 @@ class ArabicTranslateFeature:
 
             if self.arabic_pattern.search(message.content):
                 translated_text = await self.bot.loop.run_in_executor(
-                    func=self._translate_with_gemini, args=(message.content,)
+                    None, self._translate_with_gemini, message.content
                 )
 
                 if translated_text is None:

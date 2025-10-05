@@ -1,19 +1,15 @@
 import re
-import google.genai as genai
 from google.genai import types
 from discord.ext import commands
 from discord import Message
-from config import ConfigManager
 from utils import ignore_channel_in_prod
+from gemini_service import GeminiService
 
 
 class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.config = ConfigManager()
-        self.gemini_api_key = self.config.get_gemini_key()
-        self.gemini_model_name = "gemini-2.5-flash"
-        self.client = genai.Client(api_key=self.gemini_api_key)
+        self.gemini_service = GeminiService()
         self.arabic_pattern = re.compile(r"[\u0600-\u06FF]")
 
     def _translate_with_gemini(self, text: str) -> str | None:
@@ -30,24 +26,20 @@ class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
             )
         ]
 
-        try:
-            response = self.client.models.generate_content(
-                model=self.gemini_model_name,
-                contents=conversation_history,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction
-                ),
-            )
-            return response.text if response and response.text else None
-        except Exception as e:
-            print(f"ArabicTranslateFeature: Translation error: {e}")
+        translation = self.gemini_service.make_gemini_request(
+            conversation_history, system_instruction
+        )
+
+        if not translation or translation.startswith("Sorry,"):
+            print(f"ArabicTranslateFeature: Translation error: {translation}")
             return None
+
+        return translation
 
     @commands.Cog.listener()
     @ignore_channel_in_prod()
     async def on_message(self, message: Message):
         """Hook into on_message to auto-translate Arabic text."""
-        # Prevent bot self-reply loops and processing commands
         if message.author.bot or message.content.startswith(self.bot.command_prefix):  # type: ignore
             return
 

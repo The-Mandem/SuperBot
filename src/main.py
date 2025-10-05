@@ -6,6 +6,7 @@ from features.gemini_feature import GeminiFeature
 from features.rundown_feature import RundownFeature
 from features.postman_feature import Postman
 from features.bqq_feature import NoBqqFeature
+from features.autoTranslation_feature import ArabicTranslateFeature
 
 intents: Intents = Intents.default()
 intents.message_content = True
@@ -37,6 +38,10 @@ class MyBot(commands.Bot):
         # Bqq feature
         bqq_feature = NoBqqFeature(self)
         await bqq_feature.setup()
+
+        # Auto Translate Feature
+        autoTranslation_feature = ArabicTranslateFeature(bot)
+        await autoTranslation_feature.setup()
 
         print("All features initialized and set up.")
 

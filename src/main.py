@@ -25,7 +25,7 @@ class MyBot(commands.Bot):
 
         config = ConfigManager()
         if config.get_app_env() == "dev":
-            start_watcher(self, cogs_folder)
+            start_watcher(self)
 
 
 bot = MyBot(command_prefix="!", intents=intents)

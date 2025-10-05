@@ -9,13 +9,12 @@ from discord import Message
 from utils import ignore_channel_in_prod
 
 
-class InstagramFeature:
+class InstagramCog(commands.Cog, name="Instagram"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     def _get_shortcode(self, user_input: str) -> str | None:
         """Extracts Instagram shortcode from a URL."""
-        # Pattern to find shortcode in various Instagram URL formats
         pattern = r"(?:https?:\/\/)?(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]{11})"
         match = re.search(pattern, user_input)
         return match.group(1) if match else None
@@ -29,11 +28,10 @@ class InstagramFeature:
             download_comments=False,
             save_metadata=False,
             compress_json=False,
-            post_metadata_txt_pattern="",  # Avoid .txt files
+            post_metadata_txt_pattern="",
         )
         try:
             post = instaloader.Post.from_shortcode(L.context, shortcode)
-            # Download to a directory named after the shortcode
             L.download_post(post, target=shortcode)
             return True
         except instaloader.exceptions.ProfileNotExistsException:
@@ -65,21 +63,16 @@ class InstagramFeature:
     def _compress_video(self, input_path: str, target_size_mb: float) -> str | None:
         """Compresses a video to a target size using two-pass ffmpeg encoding."""
         output_path = f"{os.path.splitext(input_path)[0]}_compressed.mp4"
-        # Target a size slightly below the limit for a margin of error
         target_size_bytes = (target_size_mb - 0.2) * 1024 * 1024
         log_file_prefix = os.path.join(
             os.path.dirname(input_path), f"ffmpeg_log_{os.path.basename(input_path)}"
         )
 
         try:
-            # Get video duration to calculate the required bitrate
             probe = ffmpeg.probe(input_path)
             duration = float(probe["format"]["duration"])
-
-            # Calculate target bitrates for two-pass encoding
-            audio_bitrate = 128 * 1024  # 128k
+            audio_bitrate = 128 * 1024
             target_total_bitrate = (target_size_bytes * 8) / duration
-            # Ensure target video bitrate is a positive number
             target_video_bitrate = max(1, target_total_bitrate - audio_bitrate)
 
             if target_video_bitrate <= 1:
@@ -92,7 +85,6 @@ class InstagramFeature:
                 f"Instagram Feature: Compressing {input_path}. Target video bitrate: {target_video_bitrate / 1024:.0f} kb/s"
             )
 
-            # Pass 1
             ffmpeg.input(input_path).output(
                 "nul" if os.name == "nt" else "/dev/null",
                 vcodec="libx264",
@@ -100,7 +92,6 @@ class InstagramFeature:
                 **{"pass": 1, "f": "mp4", "b:v": target_video_bitrate},
             ).run(cmd="ffmpeg", quiet=True, overwrite_output=True)
 
-            # Pass 2
             ffmpeg.input(input_path).output(
                 output_path,
                 vcodec="libx264",
@@ -141,13 +132,12 @@ class InstagramFeature:
                 os.remove(output_path)
             return None
         finally:
-            # Clean up ffmpeg log files
             for file in os.listdir(os.path.dirname(input_path)):
                 if file.startswith(os.path.basename(log_file_prefix)):
                     try:
                         os.remove(os.path.join(os.path.dirname(input_path), file))
                     except OSError:
-                        pass  # Ignore if file is already gone
+                        pass
 
     async def _send_media(self, shortcode: str, original_message: Message):
         """Sends downloaded media to Discord, compressing if necessary."""
@@ -183,17 +173,15 @@ class InstagramFeature:
                     await original_message.reply(file=discord_file)
                 sent_media = True
             except discord.errors.HTTPException as e:
-                if e.status == 413:  # Payload too large
+                if e.status == 413:
                     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
 
-                    # Only attempt to compress video files
                     if file_path.lower().endswith(".mp4"):
                         DISCORD_LIMIT_MB = 8.0
                         status_msg = await original_message.reply(
                             f"The video is too large ({file_size_mb:.2f}MB). Trying to compress it to fit under {DISCORD_LIMIT_MB}MB, please wait..."
                         )
 
-                        # Run blocking compression in an executor
                         compressed_path = await self.bot.loop.run_in_executor(
                             None, self._compress_video, file_path, DISCORD_LIMIT_MB
                         )
@@ -204,7 +192,6 @@ class InstagramFeature:
                                     compressed_path
                                 ) / (1024 * 1024)
                                 with open(compressed_path, "rb") as f:
-                                    # Preserve original filename for user
                                     discord_file = discord.File(
                                         f, filename=os.path.basename(file_path)
                                     )
@@ -222,17 +209,14 @@ class InstagramFeature:
                                     f"You can view the original here: `https://www.instagram.com/p/{shortcode}/`"
                                 )
                             finally:
-                                # Delete the "compressing..." message
                                 await status_msg.delete()
                         else:
-                            # Compression failed
                             await status_msg.delete()
                             await original_message.reply(
                                 f"Sorry, I couldn't compress the video down to a sendable size. "
                                 f"You can view it here: `https://www.instagram.com/p/{shortcode}/`"
                             )
                     else:
-                        # Image or other non-video file is too large
                         await original_message.reply(
                             f"Sorry, a media file from the Instagram post is too large to upload to Discord ({file_size_mb:.2f}MB). "
                             f"Discord's limit for bots is 8MB. "
@@ -251,7 +235,6 @@ class InstagramFeature:
                     f"Sorry, I encountered an unexpected error trying to send the media for `https://www.instagram.com/p/{shortcode}/`."
                 )
 
-        # Cleanup
         if os.path.exists(media_dir):
             try:
                 shutil.rmtree(media_dir)
@@ -260,12 +243,14 @@ class InstagramFeature:
 
         return sent_media
 
+    @commands.Cog.listener()
     @ignore_channel_in_prod()
-    async def on_instagram_message(self, message: Message):
+    async def on_message(self, message: Message):
         """Listener for messages, checks for Instagram links."""
         if message.author == self.bot.user:
-            return  # Ignore messages from the bot itself
+            return
 
+        # Do not process commands
         if message.content.startswith(self.bot.command_prefix):  # type: ignore
             return
 
@@ -311,7 +296,6 @@ class InstagramFeature:
                 except discord.errors.NotFound:
                     pass
 
-    async def setup(self):
-        """Sets up the Instagram feature by adding message listener."""
-        self.bot.add_listener(self.on_instagram_message, "on_message")
-        print("Instagram feature loaded and message listener registered.")
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(InstagramCog(bot))

@@ -4,9 +4,10 @@ from google.genai import types
 from discord.ext import commands
 from discord import Message
 from config import ConfigManager
+from utils import ignore_channel_in_prod
 
 
-class ArabicTranslateFeature:
+class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.config = ConfigManager()
@@ -42,30 +43,28 @@ class ArabicTranslateFeature:
             print(f"ArabicTranslateFeature: Translation error: {e}")
             return None
 
-    async def setup(self):
+    @commands.Cog.listener()
+    @ignore_channel_in_prod()
+    async def on_message(self, message: Message):
         """Hook into on_message to auto-translate Arabic text."""
+        # Prevent bot self-reply loops and processing commands
+        if message.author.bot or message.content.startswith(self.bot.command_prefix):  # type: ignore
+            return
 
-        @self.bot.event
-        async def on_message(message: Message):
-            # Prevent bot self-reply loops
-            if message.author.bot:
+        if self.arabic_pattern.search(message.content):
+            translated_text = await self.bot.loop.run_in_executor(
+                None, self._translate_with_gemini, message.content
+            )
+
+            if translated_text is None:
+                print("Translation failed")
                 return
 
-            if self.arabic_pattern.search(message.content):
-                translated_text = await self.bot.loop.run_in_executor(
-                    None, self._translate_with_gemini, message.content
-                )
+            try:
+                await message.reply(f"🌍 Translation:\n{translated_text}")
+            except Exception as e:
+                print(f"ArabicTranslateFeature: Error replying: {e}")
 
-                if translated_text is None:
-                    print("Translation failed")
-                    return
 
-                try:
-                    await message.reply(f"🌍 Translation:\n{translated_text}")
-                except Exception as e:
-                    print(f"ArabicTranslateFeature: Error replying: {e}")
-
-            # Allow commands to still work
-            await self.bot.process_commands(message)
-
-        print("Arabic Translate feature loaded (auto Arabic → English).")
+async def setup(bot: commands.Bot):
+    await bot.add_cog(AutoTranslationCog(bot))

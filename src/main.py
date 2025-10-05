@@ -68,17 +68,19 @@ async def on_message(message: Message) -> None:
         and config.get_app_env() == "prod"
     ):
         return
-    # Basic logging (can be expanded or moved to a dedicated logging module)
-    username = str(message.author)
-    user_message = message.content
-    channel_name = str(message.channel)
-    guild_name = str(message.guild.name) if message.guild else "DirectMessage"
 
-    log_message = f'[{guild_name} - #{channel_name}] {username}: "{user_message}"'
-    # Truncate long messages for cleaner logs
-    if len(log_message) > 300:
-        log_message = log_message[:297] + "..."
-    print(log_message)
+    # Only log in development mode
+    if config.get_app_env() == "dev":
+        username = str(message.author)
+        user_message = message.content
+        channel_name = str(message.channel)
+        guild_name = str(message.guild.name) if message.guild else "DirectMessage"
+
+        log_message = f'[{guild_name} - #{channel_name}] {username}: "{user_message}"'
+        # Truncate long messages for cleaner logs
+        if len(log_message) > 300:
+            log_message = log_message[:297] + "..."
+        print(log_message)
 
     await bot.process_commands(message)
 

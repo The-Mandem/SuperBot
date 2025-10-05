@@ -2,6 +2,7 @@ from pathlib import Path
 from discord import Intents, Message
 from discord.ext import commands
 from config import ConfigManager
+from reloader import start_watcher
 
 intents: Intents = Intents.default()
 intents.message_content = True
@@ -11,18 +12,20 @@ intents.message_content = True
 # This is the recommended way to handle one-time async setup.
 class MyBot(commands.Bot):
     async def setup_hook(self) -> None:
-        """This hook is called once when the bot is setting up, before login."""
         print("Loading cogs...")
         cogs_folder = Path(__file__).parent / "cogs"
         for file_path in cogs_folder.glob("*.py"):
             if not file_path.name.startswith("__"):
                 try:
-                    # The module path is 'cogs.filename_without_py'
                     await self.load_extension(f"{cogs_folder.name}.{file_path.stem}")
-                    print(f"-> Successfully loaded cog: {file_path.name}")
+                    print(f"Successfully loaded cog: {file_path.name}")
                 except Exception as e:
-                    print(f"-> Failed to load cog {file_path.name}: {e}")
+                    print(f"Failed to load cog {file_path.name}: {e}")
         print("All available cogs loaded.")
+
+        config = ConfigManager()
+        if config.get_app_env() == "dev":
+            start_watcher(self, cogs_folder)
 
 
 bot = MyBot(command_prefix="!", intents=intents)

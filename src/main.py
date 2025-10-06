@@ -1,12 +1,8 @@
+from pathlib import Path
 from discord import Intents, Message
 from discord.ext import commands
 from config import ConfigManager
-from features.instagram_feature import InstagramFeature
-from features.gemini_feature import GeminiFeature
-from features.rundown_feature import RundownFeature
-from features.postman_feature import Postman
-from features.bqq_feature import NoBqqFeature
-from features.autoTranslation_feature import ArabicTranslateFeature
+from reloader import start_watcher
 
 intents: Intents = Intents.default()
 intents.message_content = True
@@ -16,34 +12,20 @@ intents.message_content = True
 # This is the recommended way to handle one-time async setup.
 class MyBot(commands.Bot):
     async def setup_hook(self) -> None:
-        """This hook is called once when the bot is setting up, before login."""
-        print("Initializing features...")
+        print("Loading cogs...")
+        cogs_folder = Path(__file__).parent / "cogs"
+        for file_path in cogs_folder.glob("*.py"):
+            if not file_path.name.startswith("__"):
+                try:
+                    await self.load_extension(f"{cogs_folder.name}.{file_path.stem}")
+                    print(f"Successfully loaded cog: {file_path.name}")
+                except Exception as e:
+                    print(f"Failed to load cog {file_path.name}: {e}")
+        print("All available cogs loaded.")
 
-        # Instagram Feature
-        instagram_feature = InstagramFeature(self)
-        await instagram_feature.setup()
-
-        # Gemini Feature
-        gemini_feature = GeminiFeature(self)
-        await gemini_feature.setup()
-
-        # Rundown Feature
-        rundown_feature = RundownFeature(self)
-        await rundown_feature.setup()
-
-        # Postman/API caller Feature
-        postman_feature = Postman(self)
-        await postman_feature.setup()
-
-        # Bqq feature
-        bqq_feature = NoBqqFeature(self)
-        await bqq_feature.setup()
-
-        # Auto Translate Feature
-        autoTranslation_feature = ArabicTranslateFeature(bot)
-        await autoTranslation_feature.setup()
-
-        print("All features initialized and set up.")
+        config = ConfigManager()
+        if config.get_app_env() == "dev":
+            start_watcher(self)
 
 
 bot = MyBot(command_prefix="!", intents=intents)
@@ -61,20 +43,12 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_message(message: Message) -> None:
-    config = ConfigManager()
     # Ignore messages from the bot itself to prevent loops
     if message.author == bot.user:
         return
-    # Prod bot ignores tester channel
-    tester_channel_id = config.get_tester_channel_id()
-    if (
-        tester_channel_id is not None
-        and message.channel.id == tester_channel_id
-        and config.get_app_env() == "prod"
-    ):
-        return
 
     # Only log in development mode
+    config = ConfigManager()
     if config.get_app_env() == "dev":
         username = str(message.author)
         user_message = message.content
@@ -87,6 +61,7 @@ async def on_message(message: Message) -> None:
             log_message = log_message[:297] + "..."
         print(log_message)
 
+    # Process commands - essential for command handling
     await bot.process_commands(message)
 
 

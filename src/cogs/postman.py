@@ -5,7 +5,7 @@ from discord.ext import commands
 from discord import Message, Embed
 
 
-class Postman:
+class PostmanCog(commands.Cog, name="Postman"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.format_message = "Usage: <request_type> <endpoint> <param:param_value> (<auth:bearer-token> optional). Please wrap key value pairs in quotes. accepted request types: put, post, get, delete"
@@ -67,12 +67,6 @@ class Postman:
         except json.JSONDecodeError:
             return ("success", response.text)
 
-    async def handle_postman_command(
-        self, message: Message, req_type: str, endpoint: str, *args: str
-    ):
-        status, response = self._make_request(req_type, endpoint, *args)
-        await self._send_response_message(message, status, response)
-
     async def _send_response_message(self, message: Message, status: str, content: str):
         if status == "error":
             embed = Embed(
@@ -96,18 +90,19 @@ class Postman:
                     )
                 )
 
-    async def setup(self):
-        @commands.command(name="postman", help=self.format_message)
-        async def postman_command(
-            ctx: commands.Context, req_type: str, endpoint: str, *args: str
-        ):
-            if not req_type or not endpoint:
-                await ctx.send("Please provide the request type and endpoint.")
-                return
+    @commands.command(name="postman")
+    async def postman_command(
+        self, ctx: commands.Context, req_type: str, endpoint: str, *args: str
+    ):
+        """A command to make API requests similar to Postman."""
+        if not req_type or not endpoint:
+            await ctx.send("Please provide the request type and endpoint.")
+            return
 
-            async with ctx.typing():
-                status, response = self._make_request(req_type, endpoint, *args)
-                await self._send_response_message(ctx.message, status, response)
+        async with ctx.typing():
+            status, response = self._make_request(req_type, endpoint, *args)
+            await self._send_response_message(ctx.message, status, response)
 
-        self.bot.add_command(postman_command)
-        print("Postman feature loaded and command registered.")
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(PostmanCog(bot))

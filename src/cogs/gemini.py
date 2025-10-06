@@ -107,19 +107,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
             if not text_content_for_part.strip():
                 continue
 
-            message_to_send_discord: str
-            if is_error_response:
-                message_to_send_discord = text_content_for_part
-            else:
-                trimmed_content = text_content_for_part.strip()
-                is_already_formatted_as_code_block = trimmed_content.startswith(
-                    "```"
-                ) and trimmed_content.endswith("```")
-
-                if is_already_formatted_as_code_block:
-                    message_to_send_discord = text_content_for_part
-                else:
-                    message_to_send_discord = text_content_for_part
+            message_to_send_discord = text_content_for_part
 
             try:
                 msg_obj = await ctx.reply(message_to_send_discord)

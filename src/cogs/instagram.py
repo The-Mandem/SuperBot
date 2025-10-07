@@ -6,7 +6,6 @@ import shutil
 import ffmpeg
 from discord.ext import commands
 from discord import Message
-from utils import ignore_channel_in_prod
 
 
 class InstagramCog(commands.Cog, name="Instagram"):
@@ -244,7 +243,6 @@ class InstagramCog(commands.Cog, name="Instagram"):
         return sent_media
 
     @commands.Cog.listener()
-    @ignore_channel_in_prod()
     async def on_message(self, message: Message):
         """Listener for messages, checks for Instagram links."""
         if message.author == self.bot.user:

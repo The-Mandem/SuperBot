@@ -2,7 +2,6 @@ import re
 from google.genai import types
 from discord.ext import commands
 from discord import Message
-from utils import ignore_channel_in_prod
 from gemini_service import GeminiService
 
 
@@ -37,7 +36,6 @@ class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
         return translation
 
     @commands.Cog.listener()
-    @ignore_channel_in_prod()
     async def on_message(self, message: Message):
         """Hook into on_message to auto-translate Arabic text."""
         if message.author.bot or message.content.startswith(self.bot.command_prefix):  # type: ignore

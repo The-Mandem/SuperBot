@@ -47,8 +47,15 @@ async def on_message(message: Message) -> None:
     if message.author == bot.user:
         return
 
-    # Only log in development mode
     config = ConfigManager()
+
+    # This block will ignore the tester channel in production for ALL bot activity.
+    if config.get_app_env() == "prod":
+        tester_channel_id = config.get_tester_channel_id()
+        if tester_channel_id is not None and message.channel.id == tester_channel_id:
+            return  # Stop all further processing of the message
+
+    # Only log in development mode
     if config.get_app_env() == "dev":
         username = str(message.author)
         user_message = message.content

@@ -2,7 +2,7 @@ from google.genai import types
 from discord.ext import commands
 from discord import Message
 from collections import OrderedDict
-from gemini_service import GeminiService
+from services.gemini_service import GeminiService
 
 
 class GeminiCog(commands.Cog, name="Gemini"):

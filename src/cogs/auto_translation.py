@@ -2,7 +2,7 @@ import re
 from google.genai import types
 from discord.ext import commands
 from discord import Message
-from gemini_service import GeminiService
+from services.gemini_service import GeminiService
 
 
 class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):

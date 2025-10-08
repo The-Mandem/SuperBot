@@ -1,6 +1,6 @@
 import google.genai as genai
 from google.genai import types, errors
-from config import ConfigManager
+from config.manager import ConfigManager
 from typing import List
 
 

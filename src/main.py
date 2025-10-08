@@ -1,88 +1,18 @@
-from pathlib import Path
-from discord import Intents, Message
-from discord.ext import commands
-from config import ConfigManager
-from reloader import start_watcher
-
-intents: Intents = Intents.default()
-intents.message_content = True
+from botcore.bot import MyBot
+from config.manager import ConfigManager
 
 
-# We create a custom Bot class to override the setup_hook method.
-# This is the recommended way to handle one-time async setup.
-class MyBot(commands.Bot):
-    async def setup_hook(self) -> None:
-        print("Loading cogs...")
-        cogs_folder = Path(__file__).parent / "cogs"
-        for file_path in cogs_folder.glob("*.py"):
-            if not file_path.name.startswith("__"):
-                try:
-                    await self.load_extension(f"{cogs_folder.name}.{file_path.stem}")
-                    print(f"Successfully loaded cog: {file_path.name}")
-                except Exception as e:
-                    print(f"Failed to load cog {file_path.name}: {e}")
-        print("All available cogs loaded.")
-
-        config = ConfigManager()
-        if config.get_app_env() == "dev":
-            start_watcher(self)
-
-
-bot = MyBot(command_prefix="!", intents=intents)
-
-
-@bot.event
-async def on_ready() -> None:
-    """
-    This event is called when the bot has successfully connected to Discord.
-    It can be called multiple times (e.g., on reconnect), so one-time setup
-    should not be placed here.
-    """
-    print(f"{bot.user} is now running!")
-
-
-@bot.event
-async def on_message(message: Message) -> None:
-    # Ignore messages from the bot itself to prevent loops
-    if message.author == bot.user:
-        return
-
-    config = ConfigManager()
-
-    # This block will ignore the tester channel in production for ALL bot activity.
-    if config.get_app_env() == "prod":
-        tester_channel_id = config.get_tester_channel_id()
-        if tester_channel_id is not None and message.channel.id == tester_channel_id:
-            return  # Stop all further processing of the message
-
-    # Only log in development mode
-    if config.get_app_env() == "dev":
-        username = str(message.author)
-        user_message = message.content
-        channel_name = str(message.channel)
-        guild_name = str(message.guild.name) if message.guild else "DirectMessage"
-
-        log_message = f'[{guild_name} - #{channel_name}] {username}: "{user_message}"'
-        # Truncate long messages for cleaner logs
-        if len(log_message) > 300:
-            log_message = log_message[:297] + "..."
-        print(log_message)
-
-    # Process commands - essential for command handling
-    await bot.process_commands(message)
-
-
-def main() -> None:
+def main():
     config = ConfigManager()
     try:
-        discord_token = config.get_discord_token()
-        if not discord_token:
-            raise ValueError("Discord token is not available. Exiting.")
-        bot.run(discord_token)
-    except ValueError as e:
-        print(f"CRITICAL CONFIGURATION ERROR: {e}")
+        token = config.get_discord_token()
+        if not token:
+            raise ValueError("Discord token not found.")
+
+        bot = MyBot(command_prefix="!")
+        bot.run(token)
     except Exception as e:
-        print(f"An unexpected error occurred during bot startup or runtime: {e}")
+        print(f"Startup error: {e}")
 
 
 if __name__ == "__main__":

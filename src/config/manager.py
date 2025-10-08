@@ -40,7 +40,7 @@ class ConfigManager:
             self._app_env = "prod"
 
         # Store DOTENV_PATH for error messages and clarity
-        CURRENT_SCRIPT_DIR = Path(__file__).resolve().parent
+        CURRENT_SCRIPT_DIR = Path(__file__).resolve().parent.parent
         self._dotenv_path = CURRENT_SCRIPT_DIR.parent / ".env"
 
         # Load .env file

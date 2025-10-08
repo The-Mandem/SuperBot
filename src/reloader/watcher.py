@@ -16,7 +16,7 @@ class SmartReloader(FileSystemEventHandler):
 
     def __init__(self, bot):
         self.bot = bot
-        self.root_path = Path(__file__).parent.resolve()
+        self.root_path = Path(__file__).parent.parent.resolve()
         self.cogs_folder_name = "cogs"
 
     def on_modified(self, event):
@@ -89,7 +89,7 @@ class SmartReloader(FileSystemEventHandler):
 
 def start_watcher(bot):
     """Starts watching the project directory for file changes."""
-    project_root = Path(__file__).parent.resolve()
+    project_root = Path(__file__).parent.parent.resolve()
     event_handler = SmartReloader(bot)
     observer = Observer()
     observer.schedule(event_handler, str(project_root), recursive=True)

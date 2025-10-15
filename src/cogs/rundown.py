@@ -2,7 +2,7 @@ import re
 from google.genai import types
 from discord.ext import commands
 from datetime import datetime, timezone, timedelta
-from gemini_service import GeminiService
+from services.gemini_service import GeminiService
 
 
 class RundownCog(commands.Cog, name="Rundown"):

@@ -16,3 +16,4 @@ VENV/
 __pypackages__/
 .python-version
 .prettierrc
+*.json

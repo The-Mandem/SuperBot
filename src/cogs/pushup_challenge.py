@@ -371,8 +371,30 @@ class PushUpChallengeCog(commands.Cog, name="PushUpChallenge"):
         else:
             lines = []
             for i, (uid, count) in enumerate(sorted_contributors[:10], 1):
-                user = ctx.guild.get_member(int(uid))
-                name = user.display_name if user else f"User_{uid}"
+                user_id = int(uid)
+                # 1. Try to find member in server cache
+                user = ctx.guild.get_member(user_id) if ctx.guild else None
+                name = None
+
+                if user:
+                    name = user.display_name
+                else:
+                    # 2. Fallback: API fetch for member (if in server)
+                    try:
+                        if ctx.guild:
+                            user = await ctx.guild.fetch_member(user_id)
+                            name = user.display_name
+                    except (discord.NotFound, discord.HTTPException):
+                        pass
+
+                    # 3. Fallback: API fetch for global user (if not in server anymore)
+                    if not name:
+                        try:
+                            user = await self.bot.fetch_user(user_id)
+                            name = user.display_name
+                        except Exception:
+                            # 4. Final Fallback: Display raw ID if API fails
+                            name = f"User_{uid}"
 
                 # Medals
                 if i == 1:

@@ -22,7 +22,7 @@ class GeminiService:
         if not gemini_api_key:
             raise ValueError("Gemini API key is not configured.")
 
-        self.gemini_model_name = "gemini-2.5-flash"
+        self.gemini_model_name = "gemini-3.1-flash-lite-preview"
         self.client = genai.Client(api_key=gemini_api_key)
         self._initialized = True
 

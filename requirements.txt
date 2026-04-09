@@ -1,6 +1,4 @@
 discord.py
 python-dotenv
-instaloader
 google-genai
-ffmpeg-python
 watchdog

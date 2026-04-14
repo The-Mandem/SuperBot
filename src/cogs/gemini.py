@@ -2,7 +2,7 @@ from google.genai import types
 from discord.ext import commands
 from discord import Message
 from collections import OrderedDict
-from services.gemini_service import GeminiService
+from services.gemini_service import GeminiService, LLMFallbackError
 
 
 class GeminiCog(commands.Cog, name="Gemini"):
@@ -73,12 +73,23 @@ class GeminiCog(commands.Cog, name="Gemini"):
             ]
 
         async with ctx.typing():
-            raw_ai_response_text = await self.bot.loop.run_in_executor(
-                None,
-                self.gemini_service.make_gemini_request,
-                current_conversation_history,
-                system_instruction,
-            )
+            try:
+                raw_ai_response_text = await self.bot.loop.run_in_executor(
+                    None,
+                    self.gemini_service.make_gemini_request,
+                    current_conversation_history,
+                    system_instruction,
+                )
+            except LLMFallbackError:
+                await ctx.reply(
+                    "⚠️ **Gemini API failed.** Falling back to local `llama3.2:3b` model. This runs locally on the Raspberry Pi and may take a moment..."
+                )
+                raw_ai_response_text = await self.bot.loop.run_in_executor(
+                    None,
+                    self.gemini_service.make_ollama_request,
+                    current_conversation_history,
+                    system_instruction,
+                )
 
         if not raw_ai_response_text:
             await ctx.reply(

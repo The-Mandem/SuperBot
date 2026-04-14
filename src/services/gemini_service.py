@@ -39,9 +39,9 @@ class GeminiService:
         system_instruction_text: str | None,
     ) -> str | None:
         """
-        Fallback mechanism that uses a local Ollama instance running llama3.2:3b
+        Fallback mechanism that uses a local Ollama instance running llama3.2
         """
-        print("Gemini Service: Executing local Ollama fallback (llama3.2:3b)...")
+        print("Gemini Service: Executing local Ollama fallback (llama3.2)...")
         messages = []
 
         if system_instruction_text:
@@ -66,7 +66,7 @@ class GeminiService:
         try:
             response = requests.post(
                 "http://localhost:11434/api/chat",
-                json={"model": "llama3.2:3b", "messages": messages, "stream": False},
+                json={"model": "llama3.2", "messages": messages, "stream": False},
                 timeout=180,  # Generous timeout since 3b models on a Pi are slow
             )
             response.raise_for_status()

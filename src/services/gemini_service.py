@@ -1,7 +1,14 @@
+import requests
 import google.genai as genai
 from google.genai import types, errors
 from config.manager import ConfigManager
 from typing import List
+
+
+class LLMFallbackError(Exception):
+    """Raised when the Gemini API fails, signaling a need to fallback to a local LLM."""
+
+    pass
 
 
 class GeminiService:
@@ -26,14 +33,58 @@ class GeminiService:
         self.client = genai.Client(api_key=gemini_api_key)
         self._initialized = True
 
+    def make_ollama_request(
+        self,
+        conversation_contents: list[types.Content],
+        system_instruction_text: str | None,
+    ) -> str | None:
+        """
+        Fallback mechanism that uses a local Ollama instance running llama3.2:3b
+        """
+        print("Gemini Service: Executing local Ollama fallback (llama3.2:3b)...")
+        messages = []
+
+        if system_instruction_text:
+            messages.append({"role": "system", "content": system_instruction_text})
+
+        for content in conversation_contents:
+            # Convert Gemini roles to Ollama roles (user, assistant, system)
+            role = content.role
+            if role == "model":
+                role = "assistant"
+            elif role not in ["user", "system", "assistant"]:
+                role = "user"  # Default fallback role
+
+            text = ""
+            if hasattr(content, "parts") and content.parts:
+                for part in content.parts:
+                    if hasattr(part, "text") and part.text:
+                        text += part.text
+
+            messages.append({"role": role, "content": text})
+
+        try:
+            response = requests.post(
+                "http://localhost:11434/api/chat",
+                json={"model": "llama3.2:3b", "messages": messages, "stream": False},
+                timeout=180,  # Generous timeout since 3b models on a Pi are slow
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result.get("message", {}).get(
+                "content", "Sorry, local AI returned an empty response."
+            )
+        except Exception as e:
+            print(f"Gemini Service: Ollama fallback error: {e}")
+            return "Sorry, both Gemini and the local fallback AI encountered an error."
+
     def make_gemini_request(
         self,
         conversation_contents: list[types.Content],
         system_instruction_text: str | None,
     ) -> str | None:
         """
-        Makes a request to the Gemini API with the given conversation history and system instruction.
-        Returns the text response or an error message string.
+        Makes a request to the Gemini API. Raises LLMFallbackError if the API request fails.
         """
         if not conversation_contents:
             print("Gemini Service: Conversation contents list is empty.")
@@ -90,19 +141,13 @@ class GeminiService:
                 print(
                     f"Gemini Service: No text response or block reason. Response: {response}"
                 )
-                return "Sorry, the AI did not return a recognizable text response."
+                raise LLMFallbackError(
+                    "Empty or unrecognized response from Gemini API."
+                )
 
         except errors.APIError as e:
-            if e.code == 404:
-                print(
-                    f"Gemini Service: Model not found or API endpoint issue: {e.message}"
-                )
-                return "Sorry, the specified Gemini model was not found or there's an issue with the API endpoint."
-            else:
-                print(
-                    f"Gemini Service: Google API error: {e.code if hasattr(e, 'code') else 'Unknown code'} - {e.message}"
-                )
-                return f"Sorry, a Google API error occurred: {e.message}"
+            print(f"Gemini Service: API Error: {e}")
+            raise LLMFallbackError(str(e))
         except Exception as e:
-            print(f"Gemini Service: An unexpected error occurred: {e}")
-            return "Sorry, an unexpected error occurred while communicating with the AI service."
+            print(f"Gemini Service: Unexpected error: {e}")
+            raise LLMFallbackError(str(e))

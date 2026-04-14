@@ -2,7 +2,7 @@ import re
 from google.genai import types
 from discord.ext import commands
 from datetime import datetime, timezone, timedelta
-from services.gemini_service import GeminiService
+from services.gemini_service import GeminiService, LLMFallbackError
 
 
 class RundownCog(commands.Cog, name="Rundown"):
@@ -14,11 +14,6 @@ class RundownCog(commands.Cog, name="Rundown"):
 
     @staticmethod
     def _parse_duration_to_timedelta(duration_raw: str):
-        """
-        Accepts: '60m', '12h', '45' (defaults to minutes)
-        Returns: (timedelta, amount_int, unit_str) where unit_str is 'minute(s)' or 'hour(s)'
-        Raises: ValueError on invalid/too-large input
-        """
         match = RundownCog._DURATION_RE.match(duration_raw or "")
         if not match:
             raise ValueError("Invalid duration. Try `!rundown 60m` or `!rundown 2h`.")
@@ -44,10 +39,6 @@ class RundownCog(commands.Cog, name="Rundown"):
 
     @commands.command(name="rundown")
     async def rundown_command(self, ctx: commands.Context, duration: str = "10m"):
-        """
-        Fetch messages from the past <duration> and summarize.
-        Examples: !rundown 60m, !rundown 2h, !rundown 45 (defaults to minutes)
-        """
         try:
             delta, amount, unit = self._parse_duration_to_timedelta(duration)
         except ValueError as e:
@@ -93,10 +84,23 @@ class RundownCog(commands.Cog, name="Rundown"):
         )
 
         async with ctx.typing():
-            summary = self.gemini_service.make_gemini_request(
-                [types.Content(role="user", parts=[types.Part(text=prompt)])],
-                system_instruction,
-            )
+            try:
+                summary = await self.bot.loop.run_in_executor(
+                    None,
+                    self.gemini_service.make_gemini_request,
+                    [types.Content(role="user", parts=[types.Part(text=prompt)])],
+                    system_instruction,
+                )
+            except LLMFallbackError:
+                await ctx.reply(
+                    "⚠️ **Gemini API failed.** Falling back to local `llama3.2:3b` to summarize. This runs locally on the Raspberry Pi and may take a moment..."
+                )
+                summary = await self.bot.loop.run_in_executor(
+                    None,
+                    self.gemini_service.make_ollama_request,
+                    [types.Content(role="user", parts=[types.Part(text=prompt)])],
+                    system_instruction,
+                )
 
         if not summary:
             await ctx.reply("Sorry, the AI did not return a summary.")

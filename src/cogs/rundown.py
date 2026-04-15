@@ -84,37 +84,43 @@ class RundownCog(commands.Cog, name="Rundown"):
 
         prompt_value = await self.prompt.ainvoke({"messages": str(messages_2d)})
         summary = None
+        prefix = f"Ts da runDown :3 for the {len(messages_2d)} messages from the past {amount} {unit}:\n\n"
+        warning_msg = None
 
         async with ctx.typing():
             try:
-                ai_msg = await self.llm_service.primary_llm.ainvoke(prompt_value)
-                summary = ai_msg.content
+                summary, _ = await self.llm_service.stream_to_discord(
+                    ctx.message,
+                    self.llm_service.primary_llm,
+                    prompt_value,
+                    prefix=prefix,
+                )
             except Exception as e:
                 print(f"Rundown: API Error: {e}")
                 warning_msg = await ctx.reply(
                     "⚠️ **Gemini API failed.** Falling back to local `llama3.2` to summarize. This runs locally on the Raspberry Pi and may take a moment..."
                 )
                 try:
-                    ai_msg = await self.llm_service.fallback_llm.ainvoke(prompt_value)
-                    summary = ai_msg.content
+                    summary, _ = await self.llm_service.stream_to_discord(
+                        ctx.message,
+                        self.llm_service.fallback_llm,
+                        prompt_value,
+                        prefix=prefix,
+                    )
                 except Exception as fallback_e:
                     print(f"Rundown: Fallback Error: {fallback_e}")
                 finally:
-                    try:
-                        await warning_msg.delete()
-                    except Exception as delete_e:
-                        print(f"Rundown: Failed to delete warning message: {delete_e}")
+                    if warning_msg:
+                        try:
+                            await warning_msg.delete()
+                        except Exception as delete_e:
+                            print(
+                                f"Rundown: Failed to delete warning message: {delete_e}"
+                            )
 
         if not summary:
             await ctx.reply("Sorry, the AI did not return a summary.")
             return
-
-        if len(summary) > 1900:
-            summary = summary[:1900] + "..."
-
-        await ctx.reply(
-            f"Ts da runDown :3 for the {len(messages_2d)} messages from the past {amount} {unit}:\n{summary}"
-        )
 
 
 async def setup(bot: commands.Bot):

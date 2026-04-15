@@ -95,30 +95,41 @@ class GeminiCog(commands.Cog, name="Gemini"):
             {"history": current_history.messages, "question": user_current_prompt_text}
         )
 
+        warning_msg = None
         async with ctx.typing():
             try:
-                # Native async LangChain invoke
-                ai_msg = await self.llm_service.primary_llm.ainvoke(prompt_value)
-                raw_ai_response_text = ai_msg.content
+                # Stream via Native async LangChain invoke
+                (
+                    raw_ai_response_text,
+                    sent_discord_messages,
+                ) = await self.llm_service.stream_to_discord(
+                    ctx.message, self.llm_service.primary_llm, prompt_value
+                )
             except Exception as e:
                 print(f"Gemini API Error: {e}")
                 warning_msg = await ctx.reply(
                     "⚠️ **Gemini API failed.** Falling back to local `llama3.2` model. This runs locally on the Raspberry Pi and may take a moment..."
                 )
                 try:
-                    # Async local fallback invoke
-                    ai_msg = await self.llm_service.fallback_llm.ainvoke(prompt_value)
-                    raw_ai_response_text = ai_msg.content
+                    # Async local fallback stream invoke
+                    (
+                        raw_ai_response_text,
+                        sent_discord_messages,
+                    ) = await self.llm_service.stream_to_discord(
+                        ctx.message, self.llm_service.fallback_llm, prompt_value
+                    )
                 except Exception as fallback_e:
                     print(f"Local Fallback Error: {fallback_e}")
                     raw_ai_response_text = "Sorry, an unknown error occurred and no response was generated from the AI."
+                    sent_discord_messages = [await ctx.reply(raw_ai_response_text)]
                 finally:
-                    try:
-                        await warning_msg.delete()
-                    except Exception as delete_e:
-                        print(
-                            f"Gemini API: Failed to delete warning message: {delete_e}"
-                        )
+                    if warning_msg:
+                        try:
+                            await warning_msg.delete()
+                        except Exception as delete_e:
+                            print(
+                                f"Gemini API: Failed to delete warning message: {delete_e}"
+                            )
 
         if not raw_ai_response_text:
             await ctx.reply(
@@ -127,33 +138,6 @@ class GeminiCog(commands.Cog, name="Gemini"):
             return
 
         is_error_response = raw_ai_response_text.startswith("Sorry,")
-
-        # Chunk the response for Discord's character limits
-        display_text_parts = []
-        if not is_error_response and len(raw_ai_response_text) > 2000:
-            current_part = ""
-            for line in raw_ai_response_text.splitlines(keepends=True):
-                if len(current_part) + len(line) > 1980:
-                    display_text_parts.append(current_part.strip())
-                    current_part = line
-                else:
-                    current_part += line
-            if current_part.strip():
-                display_text_parts.append(current_part.strip())
-        else:
-            display_text_parts.append(raw_ai_response_text)
-
-        sent_discord_messages: list[Message] = []
-        for text_content_for_part in display_text_parts:
-            if not text_content_for_part.strip():
-                continue
-
-            try:
-                msg_obj = await ctx.reply(text_content_for_part)
-                sent_discord_messages.append(msg_obj)
-            except Exception as e:
-                print(f"Error sending Discord message part: {e}")
-                await ctx.reply(f"Error sending part of the response: {e}")
 
         # Update and map memory to the final message ID
         if sent_discord_messages and not is_error_response:

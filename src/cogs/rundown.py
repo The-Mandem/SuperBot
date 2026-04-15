@@ -1,5 +1,4 @@
 import re
-from google.genai import types
 from discord.ext import commands
 from datetime import datetime, timezone, timedelta
 from services.gemini_service import GeminiService, LLMFallbackError
@@ -88,17 +87,17 @@ class RundownCog(commands.Cog, name="Rundown"):
                 summary = await self.bot.loop.run_in_executor(
                     None,
                     self.gemini_service.make_gemini_request,
-                    [types.Content(role="user", parts=[types.Part(text=prompt)])],
+                    [{"role": "user", "content": prompt}],
                     system_instruction,
                 )
             except LLMFallbackError:
                 await ctx.reply(
-                    "⚠️ **Gemini API failed.** Falling back to local `llama3.2:3b` to summarize. This runs locally on the Raspberry Pi and may take a moment..."
+                    "⚠️ **Gemini API failed.** Falling back to local `llama3.2` to summarize. This runs locally on the Raspberry Pi and may take a moment..."
                 )
                 summary = await self.bot.loop.run_in_executor(
                     None,
                     self.gemini_service.make_ollama_request,
-                    [types.Content(role="user", parts=[types.Part(text=prompt)])],
+                    [{"role": "user", "content": prompt}],
                     system_instruction,
                 )
 

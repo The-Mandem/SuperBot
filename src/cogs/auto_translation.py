@@ -1,5 +1,4 @@
 import re
-from google.genai import types
 from discord.ext import commands
 from discord import Message
 from services.gemini_service import GeminiService, LLMFallbackError
@@ -17,12 +16,7 @@ class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
             "Translate the following Arabic text into English. "
             "Only return the translation, no explanations."
         )
-        conversation_history = [
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=text)],
-            )
-        ]
+        conversation_history = [{"role": "user", "content": text}]
         return conversation_history, system_instruction
 
     def _translate_with_gemini(self, text: str) -> str | None:
@@ -58,7 +52,7 @@ class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
                 )
             except LLMFallbackError:
                 await message.reply(
-                    "⚠️ **Translation API failed.** Falling back to local `llama3.2:3b`. This may take a moment...",
+                    "⚠️ **Translation API failed.** Falling back to local `llama3.2`. This may take a moment...",
                     mention_author=False,
                 )
                 translated_text = await self.bot.loop.run_in_executor(

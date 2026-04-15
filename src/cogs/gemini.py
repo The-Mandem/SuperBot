@@ -1,4 +1,3 @@
-from google.genai import types
 from discord.ext import commands
 from discord import Message
 from collections import OrderedDict
@@ -9,7 +8,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.gemini_service = GeminiService()
-        self.conversations: OrderedDict[int, list[types.Content]] = OrderedDict()
+        self.conversations: OrderedDict[int, list[dict]] = OrderedDict()
         self.MAX_ACTIVE_CONVERSATIONS = 50
         self.MAX_CONVERSATION_HISTORY_MESSAGES = 50
 
@@ -27,7 +26,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
 
         user_current_prompt_text = prompt
         system_instruction = "Please keep your response concise and brief."
-        current_conversation_history: list[types.Content] = []
+        current_conversation_history: list[dict] = []
 
         thread = []
         latest_message = ctx.message
@@ -61,10 +60,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
                     self.conversations.move_to_end(replied_message.id)
 
         current_conversation_history.append(
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=user_current_prompt_text)],
-            )
+            {"role": "user", "content": user_current_prompt_text}
         )
 
         if len(current_conversation_history) > self.MAX_CONVERSATION_HISTORY_MESSAGES:
@@ -82,7 +78,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
                 )
             except LLMFallbackError:
                 await ctx.reply(
-                    "⚠️ **Gemini API failed.** Falling back to local `llama3.2:3b` model. This runs locally on the Raspberry Pi and may take a moment..."
+                    "⚠️ **Gemini API failed.** Falling back to local `llama3.2` model. This runs locally on the Raspberry Pi and may take a moment..."
                 )
                 raw_ai_response_text = await self.bot.loop.run_in_executor(
                     None,
@@ -132,10 +128,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
 
             history_to_store = list(current_conversation_history)
             history_to_store.append(
-                types.Content(
-                    role="model",
-                    parts=[types.Part.from_text(text=raw_ai_response_text)],
-                )
+                {"role": "assistant", "content": raw_ai_response_text}
             )
 
             if len(history_to_store) > self.MAX_CONVERSATION_HISTORY_MESSAGES:

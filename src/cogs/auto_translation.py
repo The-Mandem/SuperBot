@@ -37,7 +37,7 @@ class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
                     translated_text = ai_msg.content
                 except Exception as e:
                     print(f"ArabicTranslateFeature: API Error: {e}")
-                    await message.reply(
+                    warning_msg = await message.reply(
                         "⚠️ **Translation API failed.** Falling back to local `llama3.2`. This may take a moment...",
                         mention_author=False,
                     )
@@ -49,6 +49,13 @@ class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
                     except Exception as fallback_e:
                         print(f"ArabicTranslateFeature: Fallback error: {fallback_e}")
                         return
+                    finally:
+                        try:
+                            await warning_msg.delete()
+                        except Exception as delete_e:
+                            print(
+                                f"ArabicTranslateFeature: Failed to delete warning message: {delete_e}"
+                            )
 
             if not translated_text or translated_text.startswith("Sorry,"):
                 print("Translation failed")

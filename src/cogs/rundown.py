@@ -91,7 +91,7 @@ class RundownCog(commands.Cog, name="Rundown"):
                 summary = ai_msg.content
             except Exception as e:
                 print(f"Rundown: API Error: {e}")
-                await ctx.reply(
+                warning_msg = await ctx.reply(
                     "⚠️ **Gemini API failed.** Falling back to local `llama3.2` to summarize. This runs locally on the Raspberry Pi and may take a moment..."
                 )
                 try:
@@ -99,6 +99,11 @@ class RundownCog(commands.Cog, name="Rundown"):
                     summary = ai_msg.content
                 except Exception as fallback_e:
                     print(f"Rundown: Fallback Error: {fallback_e}")
+                finally:
+                    try:
+                        await warning_msg.delete()
+                    except Exception as delete_e:
+                        print(f"Rundown: Failed to delete warning message: {delete_e}")
 
         if not summary:
             await ctx.reply("Sorry, the AI did not return a summary.")

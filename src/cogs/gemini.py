@@ -14,7 +14,6 @@ class GeminiCog(commands.Cog, name="Gemini"):
         self.MAX_ACTIVE_CONVERSATIONS = 50
         self.MAX_CONVERSATION_HISTORY_MESSAGES = 50
 
-        # Clean LangChain Prompt Template (No weird meta-instructions)
         self.prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", "Please keep your response concise and brief."),
@@ -103,7 +102,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
                 raw_ai_response_text = ai_msg.content
             except Exception as e:
                 print(f"Gemini API Error: {e}")
-                await ctx.reply(
+                warning_msg = await ctx.reply(
                     "⚠️ **Gemini API failed.** Falling back to local `llama3.2` model. This runs locally on the Raspberry Pi and may take a moment..."
                 )
                 try:
@@ -113,6 +112,13 @@ class GeminiCog(commands.Cog, name="Gemini"):
                 except Exception as fallback_e:
                     print(f"Local Fallback Error: {fallback_e}")
                     raw_ai_response_text = "Sorry, an unknown error occurred and no response was generated from the AI."
+                finally:
+                    try:
+                        await warning_msg.delete()
+                    except Exception as delete_e:
+                        print(
+                            f"Gemini API: Failed to delete warning message: {delete_e}"
+                        )
 
         if not raw_ai_response_text:
             await ctx.reply(

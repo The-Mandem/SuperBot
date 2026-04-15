@@ -1,16 +1,27 @@
 from discord.ext import commands
 from discord import Message
 from collections import OrderedDict
-from services.litellm_service import LiteLLMService, LLMFallbackError
+from services.litellm_service import LiteLLMService
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_community.chat_message_histories import ChatMessageHistory
 
 
 class GeminiCog(commands.Cog, name="Gemini"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.llm_service = LiteLLMService()
-        self.conversations: OrderedDict[int, list[dict]] = OrderedDict()
+        self.conversations: OrderedDict[int, ChatMessageHistory] = OrderedDict()
         self.MAX_ACTIVE_CONVERSATIONS = 50
         self.MAX_CONVERSATION_HISTORY_MESSAGES = 50
+
+        # Clean LangChain Prompt Template (No weird meta-instructions)
+        self.prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", "Please keep your response concise and brief."),
+                MessagesPlaceholder(variable_name="history"),
+                ("human", "{question}"),
+            ]
+        )
 
     def _cleanup_old_conversations(self):
         """Removes the oldest conversation histories if exceeding MAX_ACTIVE_CONVERSATIONS."""
@@ -25,67 +36,83 @@ class GeminiCog(commands.Cog, name="Gemini"):
             return
 
         user_current_prompt_text = prompt
-        system_instruction = "Please keep your response concise and brief."
-        current_conversation_history: list[dict] = []
+        current_history = ChatMessageHistory()
+        cache_loaded = False
 
-        thread = []
-        latest_message = ctx.message
-
-        while True:
-            thread.append(
-                f"[{latest_message.created_at.strftime('%Y-%m-%d %H:%M:%S')}] "
-                f"{latest_message.author}: {latest_message.content}"
-            )
-
-            if not latest_message.reference:
-                break
-
-            ref = latest_message.reference
-            if ref and ref.message_id:
-                latest_message = await ctx.channel.fetch_message(ref.message_id)
-            else:
-                break
-
-        if thread and len(thread) > 0:
-            thread_history = "\n".join(reversed(thread))
-            print(f"Thread history: {thread_history}")
-            user_current_prompt_text = f"This is the thread history that you are taking into context:\n{thread_history}\n\nNow responding to: {user_current_prompt_text}. if it makes sense to reply with the thread in context, do so"
-
+        # 1. Check if replying to the bot's known conversation in memory
         if ctx.message.reference and ctx.message.reference.resolved:
             replied_message: Message = ctx.message.reference.resolved  # type: ignore
             if replied_message.author == self.bot.user:
                 retrieved_history = self.conversations.get(replied_message.id)
                 if retrieved_history:
-                    current_conversation_history = list(retrieved_history)
+                    # Shallow copy the message list to branch off seamlessly
+                    current_history.messages = list(retrieved_history.messages)
                     self.conversations.move_to_end(replied_message.id)
+                    cache_loaded = True
 
-        current_conversation_history.append(
-            {"role": "user", "content": user_current_prompt_text}
-        )
+        # 2. If no cache was loaded but there's a reply chain (e.g. bot restarted, or replying to human),
+        # dynamically build the history using proper LangChain AI/Human roles.
+        if (
+            not cache_loaded
+            and ctx.message.reference
+            and ctx.message.reference.message_id
+        ):
+            thread_msgs = []
+            curr_msg_id = ctx.message.reference.message_id
 
-        if len(current_conversation_history) > self.MAX_CONVERSATION_HISTORY_MESSAGES:
-            current_conversation_history = current_conversation_history[
+            # Traverse up the reply chain (limit to 10 to avoid hitting Discord rate limits)
+            for _ in range(10):
+                if not curr_msg_id:
+                    break
+                try:
+                    curr_msg = await ctx.channel.fetch_message(curr_msg_id)
+                    thread_msgs.append(curr_msg)
+                    if curr_msg.reference and curr_msg.reference.message_id:
+                        curr_msg_id = curr_msg.reference.message_id
+                    else:
+                        break
+                except Exception as e:
+                    print(f"GeminiCog: Failed to fetch thread message: {e}")
+                    break
+
+            # Add the fetched messages chronologically to LangChain history
+            for msg in reversed(thread_msgs):
+                if msg.author == self.bot.user:
+                    current_history.add_ai_message(msg.content)
+                else:
+                    # Prefix human messages with their name so the bot knows who said what
+                    current_history.add_user_message(
+                        f"{msg.author.display_name}: {msg.content}"
+                    )
+
+        # Truncate history to save tokens
+        if len(current_history.messages) > self.MAX_CONVERSATION_HISTORY_MESSAGES:
+            current_history.messages = current_history.messages[
                 -self.MAX_CONVERSATION_HISTORY_MESSAGES :
             ]
 
+        # Format the final prompt value to inject into the LLM
+        prompt_value = await self.prompt.ainvoke(
+            {"history": current_history.messages, "question": user_current_prompt_text}
+        )
+
         async with ctx.typing():
             try:
-                raw_ai_response_text = await self.bot.loop.run_in_executor(
-                    None,
-                    self.llm_service.make_gemini_request,
-                    current_conversation_history,
-                    system_instruction,
-                )
-            except LLMFallbackError:
+                # Native async LangChain invoke
+                ai_msg = await self.llm_service.primary_llm.ainvoke(prompt_value)
+                raw_ai_response_text = ai_msg.content
+            except Exception as e:
+                print(f"Gemini API Error: {e}")
                 await ctx.reply(
                     "⚠️ **Gemini API failed.** Falling back to local `llama3.2` model. This runs locally on the Raspberry Pi and may take a moment..."
                 )
-                raw_ai_response_text = await self.bot.loop.run_in_executor(
-                    None,
-                    self.llm_service.make_ollama_request,
-                    current_conversation_history,
-                    system_instruction,
-                )
+                try:
+                    # Async local fallback invoke
+                    ai_msg = await self.llm_service.fallback_llm.ainvoke(prompt_value)
+                    raw_ai_response_text = ai_msg.content
+                except Exception as fallback_e:
+                    print(f"Local Fallback Error: {fallback_e}")
+                    raw_ai_response_text = "Sorry, an unknown error occurred and no response was generated from the AI."
 
         if not raw_ai_response_text:
             await ctx.reply(
@@ -95,6 +122,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
 
         is_error_response = raw_ai_response_text.startswith("Sorry,")
 
+        # Chunk the response for Discord's character limits
         display_text_parts = []
         if not is_error_response and len(raw_ai_response_text) > 2000:
             current_part = ""
@@ -110,33 +138,25 @@ class GeminiCog(commands.Cog, name="Gemini"):
             display_text_parts.append(raw_ai_response_text)
 
         sent_discord_messages: list[Message] = []
-        for i, text_content_for_part in enumerate(display_text_parts):
+        for text_content_for_part in display_text_parts:
             if not text_content_for_part.strip():
                 continue
 
-            message_to_send_discord = text_content_for_part
-
             try:
-                msg_obj = await ctx.reply(message_to_send_discord)
+                msg_obj = await ctx.reply(text_content_for_part)
                 sent_discord_messages.append(msg_obj)
             except Exception as e:
                 print(f"Error sending Discord message part: {e}")
                 await ctx.reply(f"Error sending part of the response: {e}")
 
+        # Update and map memory to the final message ID
         if sent_discord_messages and not is_error_response:
             final_sent_message_id = sent_discord_messages[-1].id
 
-            history_to_store = list(current_conversation_history)
-            history_to_store.append(
-                {"role": "assistant", "content": raw_ai_response_text}
-            )
+            current_history.add_user_message(user_current_prompt_text)
+            current_history.add_ai_message(raw_ai_response_text)
 
-            if len(history_to_store) > self.MAX_CONVERSATION_HISTORY_MESSAGES:
-                history_to_store = history_to_store[
-                    -self.MAX_CONVERSATION_HISTORY_MESSAGES :
-                ]
-
-            self.conversations[final_sent_message_id] = history_to_store
+            self.conversations[final_sent_message_id] = current_history
             self._cleanup_old_conversations()
 
 

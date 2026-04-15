@@ -2,3 +2,6 @@ discord.py
 python-dotenv
 watchdog
 litellm
+langchain
+langchain-community
+langchain-core

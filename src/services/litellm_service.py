@@ -1,13 +1,5 @@
-import litellm
-from litellm import completion
+from langchain_community.chat_models import ChatLiteLLM
 from config.manager import ConfigManager
-from typing import List, Dict, Optional
-
-
-class LLMFallbackError(Exception):
-    """Raised when the Gemini API fails, signaling a need to fallback to a local LLM."""
-
-    pass
 
 
 class LiteLLMService:
@@ -28,73 +20,18 @@ class LiteLLMService:
         if not self.gemini_api_key:
             raise ValueError("Gemini API key is not configured.")
 
-        # LiteLLM routing prefix for Gemini
         self.gemini_model_name = "gemini/gemini-3.1-flash-lite-preview"
+
+        # Primary LLM via LangChain (Gemini)
+        self.primary_llm = ChatLiteLLM(
+            model=self.gemini_model_name, api_key=self.gemini_api_key
+        )
+
+        # Fallback LLM via LangChain (Local Ollama on Raspberry Pi)
+        self.fallback_llm = ChatLiteLLM(
+            model="ollama_chat/llama3.2",
+            api_base="http://localhost:11434",
+            model_kwargs={"timeout": 180},
+        )
+
         self._initialized = True
-
-    def _prepare_messages(
-        self,
-        conversation_contents: List[Dict[str, str]],
-        system_instruction: Optional[str],
-    ) -> List[Dict[str, str]]:
-        messages = []
-        if system_instruction:
-            messages.append({"role": "system", "content": system_instruction})
-        messages.extend(conversation_contents)
-        return messages
-
-    def make_ollama_request(
-        self,
-        conversation_contents: List[Dict[str, str]],
-        system_instruction_text: Optional[str],
-    ) -> Optional[str]:
-        """
-        Fallback mechanism that uses a local Ollama instance running llama3.2 via LiteLLM
-        """
-        print("LiteLLM Service: Executing local Ollama fallback (llama3.2)...")
-        messages = self._prepare_messages(
-            conversation_contents, system_instruction_text
-        )
-
-        try:
-            response = completion(
-                model="ollama/llama3.2",
-                messages=messages,
-                api_base="http://localhost:11434",
-                timeout=180,  # Generous timeout since 3b models on a Pi are slow
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            print(f"LiteLLM Service: Ollama fallback error: {e}")
-            return "Sorry, both Gemini and the local fallback AI encountered an error."
-
-    def make_gemini_request(
-        self,
-        conversation_contents: List[Dict[str, str]],
-        system_instruction_text: Optional[str],
-    ) -> Optional[str]:
-        """
-        Makes a request to the Gemini API using LiteLLM. Raises LLMFallbackError if the API request fails.
-        """
-        if not conversation_contents:
-            print("LiteLLM Service: Conversation contents list is empty.")
-            return "Sorry, there's no conversation to continue with."
-
-        messages = self._prepare_messages(
-            conversation_contents, system_instruction_text
-        )
-
-        try:
-            response = completion(
-                model=self.gemini_model_name,
-                messages=messages,
-                api_key=self.gemini_api_key,
-            )
-            return response.choices[0].message.content
-
-        except litellm.exceptions.APIError as e:
-            print(f"LiteLLM Service: API Error: {e}")
-            raise LLMFallbackError(str(e))
-        except Exception as e:
-            print(f"LiteLLM Service: Unexpected error: {e}")
-            raise LLMFallbackError(str(e))

@@ -1,13 +1,27 @@
 import re
 from discord.ext import commands
 from datetime import datetime, timezone, timedelta
-from services.litellm_service import LiteLLMService, LLMFallbackError
+from services.litellm_service import LiteLLMService
+from langchain_core.prompts import ChatPromptTemplate
 
 
 class RundownCog(commands.Cog, name="Rundown"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.llm_service = LiteLLMService()
+
+        self.prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "Summarize the key topics and associated speakers from the provided Discord messages concisely. Prioritize readability with a brief overview and bulleted speaker contributions.",
+                ),
+                (
+                    "human",
+                    "You are a Discord summarization bot. Provide a concise summary of the conversation, highlighting the main topics discussed and who contributed to each. Keep the overall summary brief, aiming for readability. Use bullet points to mention key speakers and their main points. The entire response should be under 1200 characters. Here is the conversation history, where each item is [sender, message]:\n\n{messages}",
+                ),
+            ]
+        )
 
     _DURATION_RE = re.compile(r"^\s*(\d+)\s*([mMhH]?)\s*$")
 
@@ -68,38 +82,23 @@ class RundownCog(commands.Cog, name="Rundown"):
 
         print(f"Total messages included: {len(messages_2d)}")
 
-        prompt = (
-            "You are a Discord summarization bot. Provide a concise summary of the conversation, "
-            "highlighting the main topics discussed and who contributed to each. "
-            "Keep the overall summary brief, aiming for readability. "
-            "Use bullet points to mention key speakers and their main points. "
-            "The entire response should be under 1200 characters. "
-            f"Here is the conversation history, where each item is [sender, message]:\n\n{messages_2d}"
-        )
-
-        system_instruction = (
-            "Summarize the key topics and associated speakers from the provided Discord messages concisely. "
-            "Prioritize readability with a brief overview and bulleted speaker contributions."
-        )
+        prompt_value = await self.prompt.ainvoke({"messages": str(messages_2d)})
+        summary = None
 
         async with ctx.typing():
             try:
-                summary = await self.bot.loop.run_in_executor(
-                    None,
-                    self.llm_service.make_gemini_request,
-                    [{"role": "user", "content": prompt}],
-                    system_instruction,
-                )
-            except LLMFallbackError:
+                ai_msg = await self.llm_service.primary_llm.ainvoke(prompt_value)
+                summary = ai_msg.content
+            except Exception as e:
+                print(f"Rundown: API Error: {e}")
                 await ctx.reply(
                     "⚠️ **Gemini API failed.** Falling back to local `llama3.2` to summarize. This runs locally on the Raspberry Pi and may take a moment..."
                 )
-                summary = await self.bot.loop.run_in_executor(
-                    None,
-                    self.llm_service.make_ollama_request,
-                    [{"role": "user", "content": prompt}],
-                    system_instruction,
-                )
+                try:
+                    ai_msg = await self.llm_service.fallback_llm.ainvoke(prompt_value)
+                    summary = ai_msg.content
+                except Exception as fallback_e:
+                    print(f"Rundown: Fallback Error: {fallback_e}")
 
         if not summary:
             await ctx.reply("Sorry, the AI did not return a summary.")

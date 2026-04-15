@@ -10,12 +10,12 @@ class LLMFallbackError(Exception):
     pass
 
 
-class GeminiService:
+class LiteLLMService:
     _instance = None
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(GeminiService, cls).__new__(cls)
+            cls._instance = super(LiteLLMService, cls).__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
@@ -51,7 +51,7 @@ class GeminiService:
         """
         Fallback mechanism that uses a local Ollama instance running llama3.2 via LiteLLM
         """
-        print("Gemini Service: Executing local Ollama fallback (llama3.2)...")
+        print("LiteLLM Service: Executing local Ollama fallback (llama3.2)...")
         messages = self._prepare_messages(
             conversation_contents, system_instruction_text
         )
@@ -65,7 +65,7 @@ class GeminiService:
             )
             return response.choices[0].message.content
         except Exception as e:
-            print(f"Gemini Service: Ollama fallback error: {e}")
+            print(f"LiteLLM Service: Ollama fallback error: {e}")
             return "Sorry, both Gemini and the local fallback AI encountered an error."
 
     def make_gemini_request(
@@ -77,7 +77,7 @@ class GeminiService:
         Makes a request to the Gemini API using LiteLLM. Raises LLMFallbackError if the API request fails.
         """
         if not conversation_contents:
-            print("Gemini Service: Conversation contents list is empty.")
+            print("LiteLLM Service: Conversation contents list is empty.")
             return "Sorry, there's no conversation to continue with."
 
         messages = self._prepare_messages(
@@ -93,8 +93,8 @@ class GeminiService:
             return response.choices[0].message.content
 
         except litellm.exceptions.APIError as e:
-            print(f"Gemini Service: API Error: {e}")
+            print(f"LiteLLM Service: API Error: {e}")
             raise LLMFallbackError(str(e))
         except Exception as e:
-            print(f"Gemini Service: Unexpected error: {e}")
+            print(f"LiteLLM Service: Unexpected error: {e}")
             raise LLMFallbackError(str(e))

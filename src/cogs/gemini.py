@@ -1,13 +1,13 @@
 from discord.ext import commands
 from discord import Message
 from collections import OrderedDict
-from services.gemini_service import GeminiService, LLMFallbackError
+from services.litellm_service import LiteLLMService, LLMFallbackError
 
 
 class GeminiCog(commands.Cog, name="Gemini"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.gemini_service = GeminiService()
+        self.llm_service = LiteLLMService()
         self.conversations: OrderedDict[int, list[dict]] = OrderedDict()
         self.MAX_ACTIVE_CONVERSATIONS = 50
         self.MAX_CONVERSATION_HISTORY_MESSAGES = 50
@@ -72,7 +72,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
             try:
                 raw_ai_response_text = await self.bot.loop.run_in_executor(
                     None,
-                    self.gemini_service.make_gemini_request,
+                    self.llm_service.make_gemini_request,
                     current_conversation_history,
                     system_instruction,
                 )
@@ -82,7 +82,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
                 )
                 raw_ai_response_text = await self.bot.loop.run_in_executor(
                     None,
-                    self.gemini_service.make_ollama_request,
+                    self.llm_service.make_ollama_request,
                     current_conversation_history,
                     system_instruction,
                 )

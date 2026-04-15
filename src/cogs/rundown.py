@@ -1,13 +1,13 @@
 import re
 from discord.ext import commands
 from datetime import datetime, timezone, timedelta
-from services.gemini_service import GeminiService, LLMFallbackError
+from services.litellm_service import LiteLLMService, LLMFallbackError
 
 
 class RundownCog(commands.Cog, name="Rundown"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.gemini_service = GeminiService()
+        self.llm_service = LiteLLMService()
 
     _DURATION_RE = re.compile(r"^\s*(\d+)\s*([mMhH]?)\s*$")
 
@@ -86,7 +86,7 @@ class RundownCog(commands.Cog, name="Rundown"):
             try:
                 summary = await self.bot.loop.run_in_executor(
                     None,
-                    self.gemini_service.make_gemini_request,
+                    self.llm_service.make_gemini_request,
                     [{"role": "user", "content": prompt}],
                     system_instruction,
                 )
@@ -96,7 +96,7 @@ class RundownCog(commands.Cog, name="Rundown"):
                 )
                 summary = await self.bot.loop.run_in_executor(
                     None,
-                    self.gemini_service.make_ollama_request,
+                    self.llm_service.make_ollama_request,
                     [{"role": "user", "content": prompt}],
                     system_instruction,
                 )

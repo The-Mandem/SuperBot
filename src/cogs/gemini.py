@@ -3,14 +3,14 @@ from discord import Message
 from collections import OrderedDict
 from services.litellm_service import LiteLLMService
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain_core.chat_history import InMemoryChatMessageHistory
 
 
 class GeminiCog(commands.Cog, name="Gemini"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.llm_service = LiteLLMService()
-        self.conversations: OrderedDict[int, ChatMessageHistory] = OrderedDict()
+        self.conversations: OrderedDict[int, InMemoryChatMessageHistory] = OrderedDict()
         self.MAX_ACTIVE_CONVERSATIONS = 50
         self.MAX_CONVERSATION_HISTORY_MESSAGES = 50
 
@@ -36,7 +36,7 @@ class GeminiCog(commands.Cog, name="Gemini"):
             return
 
         user_current_prompt_text = prompt
-        current_history = ChatMessageHistory()
+        current_history = InMemoryChatMessageHistory()
         cache_loaded = False
 
         # 1. Check if replying to the bot's known conversation in memory

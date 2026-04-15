@@ -3,5 +3,5 @@ python-dotenv
 watchdog
 litellm
 langchain
-langchain-community
 langchain-core
+langchain-litellm

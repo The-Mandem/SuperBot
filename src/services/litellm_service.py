@@ -1,4 +1,4 @@
-from langchain_community.chat_models import ChatLiteLLM
+from langchain_litellm import ChatLiteLLM
 from config.manager import ConfigManager
 
 

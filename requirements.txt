@@ -1,4 +1,4 @@
 discord.py
 python-dotenv
-google-genai
 watchdog
+litellm

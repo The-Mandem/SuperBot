@@ -10,10 +10,8 @@ from discord import Embed
 
 
 def is_ip_safe(ip_str: str) -> bool:
-    """Check if an IP address is public and safe to access."""
     try:
         ip = ipaddress.ip_address(ip_str)
-        # Check against all unsafe ranges
         return ip.is_global and not (
             ip.is_private
             or ip.is_loopback
@@ -27,8 +25,6 @@ def is_ip_safe(ip_str: str) -> bool:
 
 
 class SafeResolver(aiohttp.abc.AbstractResolver):
-    """Blocks SSRF for hostnames (e.g. 'localhost' or 'internal.server')"""
-
     async def resolve(self, host: str, port: int = 0, family: int = socket.AF_UNSPEC):
         loop = asyncio.get_running_loop()
         try:
@@ -67,6 +63,7 @@ class PostmanCog(commands.Cog, name="Postman"):
         self.bot = bot
 
     def _parse_value(self, val):
+        val = val.strip()
         if val.lower() == "null":
             return None
         if val.lower() == "true":
@@ -77,43 +74,47 @@ class PostmanCog(commands.Cog, name="Postman"):
             return json.loads(val)
         except json.JSONDecodeError:
             try:
+                # Be careful with ast.literal_eval on large inputs,
+                # but it's okay for short discord messages.
                 return ast.literal_eval(val)
-            except ValueError:
+            except (ValueError, SyntaxError):
                 return val
 
     async def _make_request(self, req_type: str, endpoint: str, *args: str):
         payload, headers = {}, {}
+
         for argument in args:
             if ":" not in argument:
                 continue
-            k, v = argument.split(":", 1)
-            if k.lower() == "auth":
+
+            # Split only on the first colon
+            raw_k, raw_v = argument.split(":", 1)
+            k, v = raw_k.strip(), raw_v.strip()
+
+            # If user prefixes with h-, treat it as a custom header
+            if k.lower().startswith("h-"):
+                headers[k[2:]] = v
+            elif k.lower() == "auth":
                 headers["Authorization"] = f"Bearer {v}"
             else:
                 payload[k] = self._parse_value(v)
 
-        # 1. Parse URL and validate scheme
         parsed = urllib.parse.urlparse(endpoint)
         if parsed.scheme not in ("http", "https") or not parsed.hostname:
-            return ("error", "Invalid URL. Only public http/https URLs allowed.")
+            return ("error", None, "Invalid URL. Only public http/https URLs allowed.")
 
-        # 2. PRE-CHECK: If the hostname is a literal IP, block it if it's private
-        # This fixes the bypass you encountered.
         hostname = parsed.hostname
         try:
-            # Check if it's a valid IP string
             ip_obj = ipaddress.ip_address(hostname)
             if not is_ip_safe(str(ip_obj)):
                 return (
                     "error",
+                    None,
                     f"Security Violation: Access to private IP {hostname} is forbidden.",
                 )
         except ValueError:
-            # Not an IP literal, it's a hostname (like google.com).
-            # SafeResolver will handle this during connection.
             pass
 
-        # 3. Request setup
         connector = aiohttp.TCPConnector(resolver=SafeResolver())
         timeout = aiohttp.ClientTimeout(total=10.0)
 
@@ -122,56 +123,84 @@ class PostmanCog(commands.Cog, name="Postman"):
                 connector=connector, timeout=timeout
             ) as session:
                 method = req_type.upper()
+
                 req_kwargs = {
                     "headers": headers,
-                    "params" if method == "GET" else "json": payload,
-                }
+                    "allow_redirects": False,
+                }  # Block redirects for SSRF safety
+                if method in ("GET", "HEAD", "DELETE"):
+                    req_kwargs["params"] = payload
+                else:
+                    req_kwargs["json"] = payload
 
                 async with session.request(method, endpoint, **req_kwargs) as resp:
-                    # Read max 1MB to prevent RAM exhaustion
                     chunk = await resp.content.read(1024 * 1024)
-                    text = chunk.decode("utf-8", errors="replace")
+
+                    encoding = resp.charset or "utf-8"
+                    text = chunk.decode(encoding, errors="replace")
 
                     if not (200 <= resp.status < 300):
                         return (
                             "error",
+                            resp.status,
                             f"Server returned status {resp.status}:\n{text[:500]}",
                         )
 
                     try:
-                        return ("success", json.dumps(json.loads(text), indent=2))
+                        # Prettify JSON if applicable
+                        return (
+                            "success",
+                            resp.status,
+                            json.dumps(json.loads(text), indent=2),
+                        )
                     except (json.JSONDecodeError, TypeError):
-                        return ("success", text)
+                        return ("success", resp.status, text)
+
         except ValueError as e:
-            return ("error", f"Security Block: {str(e)}")
+            return ("error", None, f"Security Block: {str(e)}")
+        except aiohttp.ClientError as e:
+            return ("error", None, f"Network Error: {str(e)}")
+        except asyncio.TimeoutError:
+            return ("error", None, "Request timed out after 10 seconds.")
         except Exception as e:
-            return ("error", f"Request Failed: {str(e)}")
+            return ("error", None, f"Request Failed: {str(e)}")
 
-    async def _send_response_message(self, ctx, status: str, content: str):
+    async def _send_response_message(
+        self, ctx, status: str, status_code: int, content: str
+    ):
         color = 0x00FF00 if status == "success" else 0xFF0000
-        title = "API Response" if status == "success" else "Request Blocked/Failed"
+        title = (
+            f"API Response [{status_code}]" if status_code else "Request Blocked/Failed"
+        )
 
-        # Truncate for Discord (4096 char limit)
-        truncated = content[:3800] + ("..." if len(content) > 3800 else "")
+        content = content.replace("```", "` ` `")
 
-        lang = "json" if (content.startswith("{") or content.startswith("[")) else ""
+        truncated = content[:3800] + ("\n...[truncated]" if len(content) > 3800 else "")
+        lang = (
+            "json" if (content.startswith("{") or content.startswith("[")) else "text"
+        )
         desc = f"```{lang}\n{truncated}\n```"
 
-        await ctx.reply(embed=Embed(title=title, description=desc, color=color))
+        embed = Embed(title=title, description=desc, color=color)
+        await ctx.reply(embed=embed)
 
+    @commands.cooldown(1, 5, commands.BucketType.user)
     @commands.command(name="postman")
     async def postman_command(
         self, ctx: commands.Context, req_type: str, endpoint: str, *args: str
     ):
-        if req_type.lower() not in ("get", "post", "put", "delete"):
+        valid_methods = ("get", "post", "put", "delete", "patch", "head", "options")
+        if req_type.lower() not in valid_methods:
             await ctx.reply(
-                "Usage: `!postman <get|post|put|delete> <url> <key:val>...`"
+                f"Usage: `!postman <{'|'.join(valid_methods)}> <url> [key:val] [h-header:val] ...`"
             )
             return
 
         async with ctx.typing():
-            status, response = await self._make_request(req_type, endpoint, *args)
-            await self._send_response_message(ctx, status, response)
+            status, status_code, response = await self._make_request(
+                req_type, endpoint, *args
+            )
+            await self._send_response_message(ctx, status, status_code, response)
 
 
 async def setup(bot: commands.Bot):

@@ -19,14 +19,15 @@ class LiteLLMService:
             return
 
         self.config = ConfigManager()
-        self.openai_api_key = self.config.get_openai_key()
-        if not self.openai_api_key:
-            raise ValueError("OpenAI API key is not configured.")
+        self.gemini_api_key = self.config.get_gemini_key()
+        if not self.gemini_api_key:
+            raise ValueError("Gemini API key is not configured.")
 
+        self.gemini_model_name = "gemini/gemini-3.1-flash-lite-preview"
+
+        # Primary LLM via LangChain (Gemini)
         self.primary_llm = ChatLiteLLM(
-            model="openai/gpt-5-nano",
-            api_key=self.openai_api_key,
-            model_kwargs={"reasoning_effort": "low"},
+            model=self.gemini_model_name, api_key=self.gemini_api_key
         )
 
         self.fallback_llm = ChatLiteLLM(

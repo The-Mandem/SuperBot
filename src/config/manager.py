@@ -87,12 +87,12 @@ class ConfigManager:
                 "and the corresponding token (DISCORD_TOKEN_PROD or DISCORD_TOKEN_DEV) is available."
             )
 
-        # Load OpenAI key
-        self._openai_key = os.getenv("OPENAI_API_KEY")
+        # Load Gemini key
+        self._gemini_key = os.getenv("GEMINI_KEY")
 
-        if not self._openai_key:
+        if not self._gemini_key:
             raise ValueError(
-                f"ERROR: OPENAI_API_KEY is not set. "
+                f"ERROR: GEMINI_KEY is not set. "
                 f"Checked .env at '{self._dotenv_path}' and system environment variables."
             )
 
@@ -132,13 +132,13 @@ class ConfigManager:
             )
         return self._app_env
 
-    def get_openai_key(self) -> str:
-        """Returns the loaded OpenAI API key."""
-        if self._openai_key is None:
+    def get_gemini_key(self) -> str:
+        """Returns the loaded Gemini API key."""
+        if self._gemini_key is None:
             raise RuntimeError(
-                "OpenAI key accessed before initialization or initialization failed."
+                "Gemini key accessed before initialization or initialization failed."
             )
-        return self._openai_key
+        return self._gemini_key
 
     def get_tester_channel_id(self) -> int | None:
         """Returns the loaded tester channel ID or None if not set/invalid."""

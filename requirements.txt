@@ -5,3 +5,5 @@ litellm
 langchain
 langchain-core
 langchain-litellm
+aiohttp
+pytz

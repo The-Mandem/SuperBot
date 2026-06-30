@@ -112,6 +112,14 @@ class ConfigManager:
                 "INFO: TESTER_CHANNEL_ID environment variable not set. The ignore_channel_in_prod decorator will not function."
             )
 
+        self._supabase_url = os.getenv("SUPABASE_URL")
+        if self._supabase_url:
+            print("INFO: Loaded SUPABASE_URL.")
+        else:
+            print(
+                "INFO: SUPABASE_URL environment variable not set. GIF storage commands will not function."
+            )
+
         ConfigManager._initialized = True
 
     def get_discord_token(self) -> str:
@@ -143,3 +151,7 @@ class ConfigManager:
     def get_tester_channel_id(self) -> int | None:
         """Returns the loaded tester channel ID or None if not set/invalid."""
         return self._tester_channel_id
+
+    def get_supabase_url(self) -> str | None:
+        """Returns the Supabase Postgres connection URL or None if not set."""
+        return self._supabase_url

@@ -5,3 +5,4 @@ litellm
 langchain
 langchain-core
 langchain-litellm
+asyncpg

@@ -79,6 +79,9 @@ class GifsCog(commands.Cog, name="Gifs"):
             return
 
         reply_to_id = None
+        if ctx.message.reference and ctx.message.reference.message_id:
+            reply_to_id = ctx.message.reference.message_id
+
         trigger_words: list[str]
         source_text: str | None
 
@@ -86,13 +89,6 @@ class GifsCog(commands.Cog, name="Gifs"):
             trigger_part, source_text = content.split("--", 1)
             trigger_words = trigger_part.split()
             source_text = source_text.strip()
-        elif ctx.message.reference and ctx.message.reference.message_id:
-            trigger_words = content.split()
-            ref = ctx.message.reference.resolved
-            if ref is None:
-                ref = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-            source_text = ref.content
-            reply_to_id = ctx.message.reference.message_id
         else:
             words = content.split()
             try:

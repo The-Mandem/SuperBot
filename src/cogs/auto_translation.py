@@ -15,7 +15,16 @@ class AutoTranslationCog(commands.Cog, name="ArabicTranslate"):
             [
                 (
                     "system",
-                    "Translate the following Arabic text into English. Only return the translation, no explanations.",
+                    (
+                        "You are an expert translator of Arabic (Modern Standard Arabic as well as "
+                        "colloquial Iraqi, Jordanian, Gulf, Egyptian, Levantine, Maghrebi, and other "
+                        "dialects) into natural, native-sounding English. "
+                        "Handle slang, idioms, and vulgarities by their actual conversational meaning "
+                        "and typical usage, not literal dictionary definitions. Infer meaning from "
+                        "context and common slang usage. Use culturally equivalent English slang "
+                        "where it exists. "
+                        "Only return the translation. No explanations, no notes, no quotes."
+                    ),
                 ),
                 ("human", "{text}"),
             ]

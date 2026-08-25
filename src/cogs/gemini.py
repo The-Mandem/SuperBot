@@ -16,7 +16,10 @@ class GeminiCog(commands.Cog, name="Gemini"):
 
         self.prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", "Please keep your response concise and brief."),
+                (
+                    "system",
+                    "You MUST keep your response to a few short sentences at most. Do not use bullet points, lists, or long explanations. Be extremely brief — answer the question directly in 1-3 sentences and stop.",
+                ),
                 MessagesPlaceholder(variable_name="history"),
                 ("human", "{question}"),
             ]
